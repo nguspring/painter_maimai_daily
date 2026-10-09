@@ -63,7 +63,8 @@ class QualityTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_template_allows_llm_and_llm_is_deduplicated(self):
         """空日程先保存模板仍会启动一次 LLM，成功来源记录会阻止再次生成。"""
-        cls = load_class("core/schedule/schedule_manager.py", "ScheduleManager", {"ensure_today_schedule", "stop_override_tasks"}, {"asyncio": asyncio, "datetime": datetime, "logger": logging.getLogger(__name__), "get_template_schedule": Mock(return_value=[]), "to_db_dict": dict})
+        calendar_service = SimpleNamespace(get_day=AsyncMock(return_value=SimpleNamespace(is_off_day=False)))
+        cls = load_class("core/schedule/schedule_manager.py", "ScheduleManager", {"ensure_today_schedule", "stop_override_tasks"}, {"asyncio": asyncio, "datetime": datetime, "now_beijing": datetime.datetime.now, "get_calendar_service": Mock(return_value=calendar_service), "logger": logging.getLogger(__name__), "get_template_schedule": Mock(return_value=[]), "to_db_dict": dict})
         obj = cls()
         values = {}
         obj._db = SimpleNamespace(list_schedule_items=Mock(return_value=[]), replace_schedule_items=Mock(), set_state=values.__setitem__, get_state=values.get)

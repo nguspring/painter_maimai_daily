@@ -507,10 +507,10 @@ def migrate_v1_to_v2(old_config: Dict[str, Any]) -> Dict[str, Any]:
 
     # ── [schedule_inject]（v2 全新，使用默认值） ──────────────
     _set(new, "schedule_inject.enabled", True)
-    _set(new, "schedule_inject.mode", "smart")
+    _set(new, "schedule_inject.mode", "always")
     _set(new, "schedule_inject.min_messages", 5)
     _set(new, "schedule_inject.min_seconds", 300)
-    _set(new, "schedule_inject.schedule_intent_enable", True)
+    _set(new, "schedule_inject.schedule_intent_enable", False)
     _set(new, "schedule_inject.schedule_context_cache_ttl_minutes", 30)
     _set(new, "schedule_inject.schedule_context_cache_max_turns", 10)
 

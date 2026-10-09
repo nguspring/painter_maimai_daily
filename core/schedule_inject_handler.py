@@ -4,12 +4,8 @@ POST_LLM 日程注入处理器（增强版）
 在 LLM 生成回复之前，将麦麦当前的日程信息注入到 prompt 中，
 让 LLM 知道麦麦"现在在做什么"，从而生成更有代入感的回复。
 
-增强功能：
-1. 意图识别：识别用户意图，决定是否注入
-2. 对话上下文：记住最近的对话内容
-3. 状态分析：分析当前日程状态
-4. 智能优化：决定最优注入策略
-5. 内容模板：润色注入内容
+always 模式每次提供北京时间、日历事实、精确当前活动与唯一下一项计划。
+smart 模式保留原有关键词过滤和按会话限频，文本格式与 always 一致。
 
 注入时机：POST_LLM（消息经过前处理后、LLM 调用前）
 注入方式：在 llm_prompt 前面追加一段日程上下文
@@ -27,7 +23,8 @@ from src.plugin_system.base.component_types import (
 
 from .inject.context_cache import get_context_cache
 from .inject.intent_classifier import classify_intent, IntentType
-from .inject.content_template import render_injection_content
+from .inject.schedule_template import render_schedule_context
+from .schedule.calendar_context import get_calendar_service, now_beijing
 
 logger = logging.getLogger(__name__)
 
@@ -66,15 +63,12 @@ class ScheduleInjectHandler(BaseEventHandler):
     在 POST_LLM 阶段将麦麦当前活动信息注入到 LLM prompt 中，
     让回复更贴合角色当前的"生活状态"。
 
-    增强功能：
-    - 意图识别：避免在技术问答等不相关场景注入
-    - 对话上下文：连续对话时保持理解
-    - 智能注入：根据分析结果优化注入策略
+    默认每次更新状态；仅 smart 模式使用意图识别与限频。
     """
 
     event_type = EventType.POST_LLM
     handler_name: str = "selfie_schedule_inject_handler"
-    handler_description: str = "在 LLM 调用前注入麦麦当前日程信息（智能增强版）"
+    handler_description: str = "在 LLM 调用前注入时间、节假日、当前活动及下一项计划"
     weight: int = 10
     intercept_message: bool = True
 
@@ -103,6 +97,10 @@ class ScheduleInjectHandler(BaseEventHandler):
         if plain_text.strip().startswith("/"):
             return (True, True, None, None, message)
 
+        mode = self.get_config("schedule_inject.mode", "always")
+        if mode not in {"smart", "always"}:
+            raise ValueError(f"日程注入模式无效：{mode!r}，仅支持 smart 或 always")
+
         # 获取 stream_id
         stream_id = getattr(message, "stream_id", None) or ""
 
@@ -126,7 +124,8 @@ class ScheduleInjectHandler(BaseEventHandler):
         should_inject = True
         inject_reason = ""
 
-        if intent_enabled:
+        # always 必须每次提供状态，不让“怎么还没睡”等生活问句被技术关键词误过滤。
+        if mode == "smart" and intent_enabled:
             intent_result = classify_intent(plain_text)
             should_inject, inject_reason = self._should_inject_by_intent(intent_result)
 
@@ -153,7 +152,6 @@ class ScheduleInjectHandler(BaseEventHandler):
             logger.debug(f"检查注入 override 失败: {e}")
 
         # 5. 节流检查（smart 模式）
-        mode = self.get_config("schedule_inject.mode", "smart")
         if mode == "smart" and not is_discussing_schedule and not self._should_inject_throttle(stream_id):
             # 增加消息计数
             _stream_msg_count[stream_id] = _stream_msg_count.get(stream_id, 0) + 1
@@ -165,20 +163,20 @@ class ScheduleInjectHandler(BaseEventHandler):
             from .schedule.schedule_manager import get_schedule_manager
 
             manager = get_schedule_manager()
-            activity = await manager.get_current_activity()
-            future_activities = await manager.get_future_activities(limit=3)
+            now = now_beijing()
+            calendar = await get_calendar_service().get_day(now.date())
+            # 首次下载可能跨越活动或日期边界，查询活动前重新取时，避免注入下载前的旧状态。
+            now = now_beijing()
+            if now.date() != calendar.date:
+                calendar = await get_calendar_service().get_day(now.date())
+            snapshot = await manager.get_injection_snapshot(now, calendar)
         except Exception as e:
             logger.warning(f"获取日程信息失败: {e}")
             return (True, True, None, None, message)
 
         # ========== 构建注入文本 ==========
 
-        inject_text = self._build_inject_text_enhanced(
-            activity=activity,
-            future_activities=future_activities,
-            user_message=plain_text,
-            is_discussing_schedule=is_discussing_schedule,
-        )
+        inject_text = render_schedule_context(snapshot, calendar)
 
         if not inject_text:
             return (True, True, None, None, message)
@@ -240,7 +238,7 @@ class ScheduleInjectHandler(BaseEventHandler):
         满足以下任一条件才注入：
         1. 该 stream 从未注入过
         2. 距离上次注入已超过 min_seconds
-        3. 距离上次注入已收到 min_messages 条消息
+        3. 距离上次注入已有 min_messages 次回复调用被限频跳过
         """
         min_seconds = self.get_config("schedule_inject.min_seconds", 300)
         min_messages = self.get_config("schedule_inject.min_messages", 5)
@@ -258,78 +256,6 @@ class ScheduleInjectHandler(BaseEventHandler):
             return True
 
         return False
-
-    def _build_inject_text_enhanced(
-        self, activity, future_activities, user_message: str = "", is_discussing_schedule: bool = False
-    ) -> str:
-        """
-        构建增强版注入文本
-
-        Args:
-            activity: 当前活动
-            future_activities: 未来活动列表
-            user_message: 用户消息
-            is_discussing_schedule: 是否正在讨论日程
-
-        Returns:
-            str: 注入文本
-        """
-        if activity is None:
-            return ""
-
-        # 获取当前活动信息
-        current_activity_type = (
-            activity.activity_type.value if hasattr(activity.activity_type, "value") else str(activity.activity_type)
-        )
-        current_description = activity.description
-        current_mood = activity.mood if hasattr(activity, "mood") else "neutral"
-
-        # 获取未来活动信息
-        future_list = []
-        if future_activities:
-            for fa in future_activities[:3]:
-                time_str = fa.time_point if hasattr(fa, "time_point") and fa.time_point else ""
-                desc = fa.description if hasattr(fa, "description") else str(fa)
-                if time_str:
-                    future_list.append(f"{time_str} {desc}")
-                else:
-                    future_list.append(desc)
-
-        # 使用内容模板引擎渲染
-        inject_text = render_injection_content(
-            current_activity=current_activity_type,
-            current_description=current_description,
-            current_mood=current_mood,
-            next_activity=future_list[0] if future_list else "",
-            next_time="",
-            future_activities=future_list[1:] if len(future_list) > 1 else [],
-        )
-
-        return inject_text
-
-    def _build_inject_text(self, activity, future_activities) -> str:
-        """
-        构建注入到 prompt 的日程文本（兼容旧版）
-        """
-        if activity is None:
-            return ""
-
-        lines = ["【可选上下文 - 麦麦当前日程】"]
-        lines.append(f"现在：{activity.activity_type.value}（{activity.description}）")
-
-        if future_activities:
-            future_parts = []
-            for fa in future_activities[:3]:
-                time_str = fa.time_point if hasattr(fa, "time_point") and fa.time_point else ""
-                if time_str:
-                    future_parts.append(f"{time_str} {fa.description}")
-                else:
-                    future_parts.append(fa.description)
-            if future_parts:
-                lines.append(f"接下来：{'、'.join(future_parts)}")
-
-        lines.append("把这些当作背景信息，自然地融入对话，不要刻意提及日程表。")
-        return "\n".join(lines)
 
     async def _get_inject_override(self, stream_id: str) -> Optional[bool]:
         """

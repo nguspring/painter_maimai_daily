@@ -684,16 +684,16 @@ CONFIG_SCHEMA = {
         ),
         "mode": ConfigField(
             type=str,
-            default="smart",
-            description="注入模式。smart=智能节流（按时间/消息数触发），always=每次都注入",
+            default="always",
+            description="always=每次回复更新日历与状态，不做意图过滤；smart=关键词过滤并按时间/次数限频",
             label="注入模式",
-            placeholder="smart",
+            placeholder="always",
             order=2,
         ),
         "min_messages": ConfigField(
             type=int,
             default=5,
-            description="smart 模式下，同一会话收到多少条消息后再次注入",
+            description="仅 smart 模式：累计被限频跳过的回复调用达到此次数后，下次调用注入",
             label="最小消息数",
             depends_on="schedule_inject.enabled",
             depends_value=True,
@@ -712,8 +712,8 @@ CONFIG_SCHEMA = {
         # 这些配置用于让注入更智能，避免在不相关的问题上注入日程
         "schedule_intent_enable": ConfigField(
             type=bool,
-            default=True,
-            description="是否启用意图识别。开启后系统会识别用户意图，只在相关问题上注入日程。例如：技术问答时不注入，询问日程时注入。建议开启",
+            default=False,
+            description="仅 smart 模式使用关键词意图识别；always 模式忽略此项",
             label="意图识别",
             depends_on="schedule_inject.enabled",
             depends_value=True,

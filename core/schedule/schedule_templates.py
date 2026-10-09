@@ -59,9 +59,10 @@ def _build_items(template: list[TemplateRow], date: str) -> list[ScheduleItem]:
     return items
 
 
-def get_template_schedule(date: str) -> list[ScheduleItem]:
-    """根据日期（YYYY-MM-DD）返回对应的兜底模板日程。"""
+def get_template_schedule(date: str, is_off_day: bool | None = None) -> list[ScheduleItem]:
+    """返回对应日期的模板；已确认休假状态优先，未知时保留原来的星期规则。"""
     target_date = datetime.date.fromisoformat(date)
-    if target_date.weekday() < 5:
+    off_day = target_date.weekday() >= 5 if is_off_day is None else is_off_day
+    if not off_day:
         return _build_items(_WEEKDAY_TEMPLATE, date)
     return _build_items(_WEEKEND_TEMPLATE, date)

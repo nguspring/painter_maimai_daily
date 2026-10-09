@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/版本-v3.6.12-blue" alt="Version">
+  <img src="https://img.shields.io/badge/版本-v3.6.14-blue" alt="Version">
   <img src="https://img.shields.io/badge/MaiBot-0.10.x+-green" alt="MaiBot">
   <img src="https://img.shields.io/badge/License-AGPL--3.0-orange" alt="License">
 </p>
@@ -14,7 +14,7 @@
 
 > 🚀 **从 v3.5.x 升级到 v3.6.9？** 请先阅读下方 [升级指南](#-从-v35x-升级到-v369)。
 
-> ✨ **v3.6.12 更新**：修复 14 项关键缺陷，包括插件加载阻断、模型权限绕过、日程注入失效、并发安全、SQLite 迁移、配置热重载等问题。详见 [v3.6.12 更新日志](#v3612-改版--2026-07-21)。
+> ✨ **v3.6.14 更新**：重写日程注入格式，明确区分当前活动与唯一下一项计划；加入北京时间、联网节日及调休感知，日程生成共用日历。详见 [v3.6.14 更新日志](#v3614-改版--2026-10-09)。
 
 ---
 
@@ -30,7 +30,7 @@
 > |------|------|
 > | 原版仓库（已更名） | [custom_pic_plugin](https://github.com/1021143806/custom_pic_plugin) → [mais-art-journal](https://github.com/1021143806/mais-art-journal) |
 > | 本仓库（改版） | https://github.com/nguspring/selfie_painter |
-> | 当前版本 | v3.6.12 |
+> | 当前版本 | v3.6.14 |
 >
 > **改版定位**：在上游画图能力的基础上，增加**内置日程系统**、**衣柜系统**、**日程注入系统**、**SSE 流式响应**等增强功能，让 Bot 更像真人。
 
@@ -187,11 +187,46 @@ git clone https://github.com/nguspring/selfie_painter.git -b dev
 插件自带日程管理，不再依赖外部 `autonomous_planning` 插件。
 
 - 每日自动通过 LLM 生成当天日程（可配置生成时间和模型）
-- LLM 不可用时自动使用工作日/周末兜底模板
+- LLM 不可用时自动使用作息模板；已确认的法定休假与调休状态优先于星期规则
 - 日程数据存储在本地 SQLite 数据库（`data/schedule.db`）
 - `/schedule` 会显示当前活动、当天全部时间段日程以及数据来源，便于直接查看一整天安排
-- 在 LLM 生成聊天回复前自动注入麦麦当前活动信息
-- 支持 smart（按时间/消息数节流）和 always 两种注入模式
+- 在 LLM 生成聊天回复前注入北京时间、日历类型、当天节日/纪念日/节气、当前活动及唯一下一项计划
+- 默认 `always`：每次更新，不使用关键词意图过滤和限频；保留 `smart` 供手动选择
+- 当前活动只选覆盖现在的时间段；空档明确为无已安排活动，不把未来活动或已经结束的活动当成正在进行
+- 活动起止时间包含日期，支持读取前一天跨午夜活动和已存在的次日计划；没有下一项时省略该区块
+- 注入规则要求按话题使用信息，不主动播报活动、不复述内部日程区块；活动描述不再随机润色
+- 自动生成与 `/schedule regen` 共用联网日历，使节假日和周末补班进入生成提示词；既有日程不会自动覆盖
+
+#### 联网日历与缓存
+
+- 放假/补班数据：[NateScarlet/holiday-cn](https://github.com/NateScarlet/holiday-cn)，包含对应国务院公告链接
+- 传统节日、流行节日、纪念日及节气：[YangH9/ChinaCalendar](https://github.com/YangH9/ChinaCalendar)
+- 圣诞节、万圣节、感恩节等补充：[wzx-xle/china-holidays-extra](https://github.com/wzx-xle/china-holidays-extra)
+- 收录范围以来源为准，不保证全球所有节日；只注入当天条目，不下载百科正文到提示词
+- 无需 API Key，使用现有 `aiohttp` 依赖；首次调用联网，以后使用插件 `data/calendar/` 下的 UTF-8 缓存，24 小时后按需刷新
+- 联网失败时有旧缓存则继续使用并注明状态；无数据、来源尚未发布公告或未覆盖年份时标记未确认，不编造放假安排
+- 来源失败后五分钟内不重复请求，没有独立后台重试任务；随后正常调用可再次获取
+- 十二月额外检查下一年度公告，避免漏掉跨年补班；公告未发布时明确标记跨年调休待核实
+
+配置示例：
+
+```toml
+[schedule_inject]
+enabled = true
+mode = "always"
+schedule_intent_enable = false  # always 模式忽略此项
+```
+
+更新文件后重启 MaiBot；需让今天已有日程立即参考节假日时，执行 `/schedule regen`。
+
+老用户的 `config.toml` 会保留原设置；拉取更新后请手动把 `[schedule_inject]` 中的 `mode` 改为 `"always"`。
+当前更新发布在 `dev` 分支，可在插件目录执行：
+
+```shell
+git pull --ff-only origin dev
+```
+
+若当前使用其他分支，先执行 `git switch dev`，再运行上述拉取命令。
 
 ### 👗 衣柜系统
 
@@ -638,6 +673,22 @@ num_inference_steps = 30
 ---
 
 ## 📝 更新日志
+
+### v3.6.14 (改版) — 2026-10-09
+
+**日程注入与联网日历**
+
+- 注入改用固定字段，明确区分“此刻正在进行”和“尚未开始”；下一项计划只保留一个，修复第一项未来活动被漏掉的问题。
+- 当前活动和下一项计划均附完整日期与起止时间，统一使用北京时间；支持跨午夜活动和数据库中已存在的次日计划。
+- 日程空档不再用未来活动或已结束活动冒充当前活动；无下一项时省略计划区块。
+- 移除随机活动润色和“自然融入对话”要求，改为仅在话题需要时使用状态，不主动播报日程。
+- 默认使用 `always`，每次回复前更新状态，不经过关键词意图过滤和限频；保留 `smart` 供手动选择。
+- 联网读取中国大陆放假/调休、传统节日、流行节日、纪念日及二十四节气；自动生成与 `/schedule regen` 共用日历信息。
+- 已确认的休假与补班状态参与模板选择；日程生成、查询和定时任务使用北京时间。
+- 日历缓存 24 小时后按需刷新；断网使用旧缓存并标记状态，无数据或年度公告尚未发布时明确标为未确认。
+- 增加日历、时间边界、空档、缓存和真实注入调用链回归测试；插件全部 28 项测试通过。
+
+**升级操作**：在 `dev` 分支拉取后，将已有配置的 `schedule_inject.mode` 设为 `"always"`，重启 MaiBot。需要立即更新今天的日程时执行 `/schedule regen`。
 
 ### v3.6.12 (改版) — 2026-07-21
 

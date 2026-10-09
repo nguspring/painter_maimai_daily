@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import importlib
+import datetime
 import json
 import logging
 import re
@@ -29,6 +30,7 @@ from .schedule_models import ScheduleItem, parse_hhmm
 from .persona_builder import build_persona_context
 from .prompt_builder import build_schedule_prompt, get_prompt_builder
 from .quality_evaluator import evaluate_schedule_quality, EvalResult
+from .calendar_context import get_calendar_service
 
 if TYPE_CHECKING:
     pass
@@ -285,6 +287,7 @@ async def generate_schedule_via_llm(
     except Exception:
         pass
 
+    calendar = await get_calendar_service().get_day(datetime.date.fromisoformat(target_date))
     prompt = build_schedule_prompt(
         persona_context=persona_context,
         history_context=history_context,
@@ -292,6 +295,7 @@ async def generate_schedule_via_llm(
         target_date=target_date,
         nickname=nickname,
         personality=personality,
+        calendar_context=calendar.render(),
     )
 
     # ========== 多轮生成 ==========

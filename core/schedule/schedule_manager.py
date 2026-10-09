@@ -21,6 +21,8 @@ from .schedule_models import (
     to_db_dict,
 )
 from .schedule_templates import get_template_schedule
+from .calendar_context import BEIJING, CalendarDay, get_calendar_service, now_beijing
+from .schedule_snapshot import ScheduleSnapshot, build_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -58,11 +60,13 @@ class ScheduleManager:
 
     async def ensure_today_schedule(self, plugin: Any | None = None) -> None:
         """确保今日有日程，优先模板，再异步尝试 LLM 覆盖（修复 F9：去重）。"""
-        today = datetime.date.today().isoformat()
+        today_date = now_beijing().date()
+        today = today_date.isoformat()
         items = await asyncio.to_thread(self._db.list_schedule_items, today)
 
         if not items:
-            template_items = get_template_schedule(today)
+            calendar = await get_calendar_service().get_day(today_date)
+            template_items = get_template_schedule(today, is_off_day=calendar.is_off_day)
             await asyncio.to_thread(
                 self._db.replace_schedule_items,
                 today,
@@ -136,7 +140,7 @@ class ScheduleManager:
 
     async def get_current_activity(self):
         """获取当前活动，永不返回 None。"""
-        now = datetime.datetime.now()
+        now = now_beijing()
         today = now.date().isoformat()
         current_minutes = now.hour * 60 + now.minute
         now_str = now.strftime("%H:%M")
@@ -171,7 +175,7 @@ class ScheduleManager:
 
     async def get_future_activities(self, limit: int = 3) -> list[Any]:
         """获取后续活动列表。"""
-        now = datetime.datetime.now()
+        now = now_beijing()
         today = now.date().isoformat()
         current_minutes = now.hour * 60 + now.minute
 
@@ -186,9 +190,28 @@ class ScheduleManager:
         rows = await asyncio.to_thread(self._db.list_schedule_items, schedule_date)
         return [from_db_row(row) for row in rows]
 
+    async def get_injection_snapshot(self, now: datetime.datetime, calendar: CalendarDay) -> ScheduleSnapshot:
+        """按同一北京时间读取精确注入快照；查询数据库但不修改既有日程。
+
+        仅今日无数据时采用模板，前后两天只读取已存在的计划，避免编造明日安排。
+        """
+        if now.tzinfo is None:
+            raise ValueError("日程快照时间必须包含时区")
+        now = now.astimezone(BEIJING)
+        today = now.date()
+        if today != calendar.date:
+            raise ValueError("日程快照与日历必须使用同一天")
+        items = await self.list_schedule_items(today.isoformat())
+        if not items:
+            items = get_template_schedule(today.isoformat(), is_off_day=calendar.is_off_day)
+        # 前一天用于恢复跨午夜活动，后一天用于展示实际已有的唯一下一项计划。
+        for offset in (-1, 1):
+            items.extend(await self.list_schedule_items((today + datetime.timedelta(days=offset)).isoformat()))
+        return build_snapshot(now, items)
+
     async def regen_today_schedule_via_llm(self, plugin: Any) -> bool:
         """手动触发 LLM 重生成。"""
-        today = datetime.date.today().isoformat()
+        today = now_beijing().date().isoformat()
         model_id = str(plugin.get_config("schedule.model_id", "planner"))
         items = await generate_schedule_via_llm(plugin, today, model_id=model_id)
         if not items:
@@ -248,7 +271,7 @@ class ScheduleManager:
         if days <= 0:
             return {}
 
-        today = datetime.date.today()
+        today = now_beijing().date()
         result: dict[str, list[Any]] = {}
 
         for i in range(1, days + 1):

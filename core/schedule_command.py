@@ -58,12 +58,12 @@ class ScheduleCommand(BaseCommand):
         """显示当前活动和当天全部日程。"""
         try:
             from .schedule.schedule_manager import get_schedule_manager
-            from datetime import date
+            from .schedule.calendar_context import now_beijing
 
             manager = get_schedule_manager()
 
             activity = await manager.get_current_activity()
-            today = date.today().isoformat()
+            today = now_beijing().date().isoformat()
             items = await manager.list_schedule_items(today)
 
             lines = ["📅 麦麦的日程"]

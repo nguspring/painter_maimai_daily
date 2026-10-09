@@ -136,6 +136,7 @@ class SchedulePromptBuilder:
         wardrobe_info: str = "",
         nickname: str = "麦麦",
         personality: str = "是一个女大学生",
+        calendar_context: str = "",
     ) -> str:
         """
         构建完整的日程生成 Prompt
@@ -147,6 +148,7 @@ class SchedulePromptBuilder:
             target_date: 目标日期（格式：YYYY-MM-DD）
             nickname: Bot 名称
             personality: 人设描述
+            calendar_context: 目标日期的日历事实；仅供生成安排参考，不改变 JSON 输出格式
 
         Returns:
             str: 完整的 Prompt
@@ -186,6 +188,14 @@ class SchedulePromptBuilder:
 
         # 合并所有部分
         parts = [system_core, core_task, ACTIVITY_TYPE_GUIDE]
+        if calendar_context:
+            parts.append(
+                "【目标日期的日历事实｜北京时间】\n" + calendar_context +
+                "\n按已确认的休息日或调休工作日安排作息，不能仅凭星期判断是否放假。"
+                "\n节日、纪念日和节气用于参考；是否参加相关活动取决于人设和兴趣，"
+                "不必为每个节日安排庆祝，也不要把普通纪念日当成放假。"
+                "\n未确认的数据不得自行编造，保留普通生活安排。"
+            )
 
         if user_appendix:
             parts.append(user_appendix)
@@ -243,6 +253,7 @@ def build_schedule_prompt(
     target_date: str,
     nickname: str = "麦麦",
     personality: str = "是一个女大学生",
+    calendar_context: str = "",
 ) -> str:
     """
     快捷函数：构建日程生成 Prompt
@@ -254,6 +265,7 @@ def build_schedule_prompt(
         target_date: 目标日期
         nickname: Bot 名称
         personality: 人设描述
+        calendar_context: 目标日期的已确认日历事实及获取状态
 
     Returns:
         str: 完整的 Prompt
@@ -265,4 +277,5 @@ def build_schedule_prompt(
         target_date=target_date,
         nickname=nickname,
         personality=personality,
+        calendar_context=calendar_context,
     )

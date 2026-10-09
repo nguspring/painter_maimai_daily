@@ -125,11 +125,12 @@ class PluginRuntimeMixin:
         """每日在指定时间重新生成日程。"""
         import datetime
         import random
+        from .core.schedule.calendar_context import now_beijing
 
         while True:
             try:
                 gen_time_str = self.get_config("schedule.auto_generate_time", "06:30")
-                now = datetime.datetime.now()
+                now = now_beijing()
                 hour, minute = map(int, gen_time_str.split(":"))
                 target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
                 if target <= now:

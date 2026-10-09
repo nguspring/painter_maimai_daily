@@ -7,7 +7,7 @@ from typing import List
 from src.plugin_system.base.component_types import PythonDependency
 
 PLUGIN_NAME = "selfie_painter_v2"
-PLUGIN_VERSION = "3.6.13"
+PLUGIN_VERSION = "3.6.14"
 PLUGIN_AUTHOR = "Ptrel，Rabbit，saberlights Kiuon，nguspring"
 ENABLE_PLUGIN = True
 DEPENDENCIES: List[str] = []
