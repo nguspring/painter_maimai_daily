@@ -15,6 +15,11 @@
 """
 from __future__ import annotations
 
+import asyncio
+import logging
+import os
+import re
+
 from collections.abc import Mapping
 from functools import wraps
 from pathlib import Path
@@ -22,11 +27,6 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional
 
 from maibot_sdk import API, Command, HookHandler, MaiBotPlugin, Tool
 from maibot_sdk.types import HookMode, HookOrder
-
-import asyncio
-import logging
-import os
-import re
 
 from .core.config.models import PainterMaimaiConfig
 from .core.quota import QuotaStore

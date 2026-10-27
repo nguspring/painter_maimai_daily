@@ -1,4 +1,4 @@
-﻿# 画家麦麦的日常 (Painter Maimai's Daily Life)
+# 画家麦麦的日常 (Painter Maimai's Daily Life)
 
 <p align="center">
   <strong>集智能绘画、生成式自拍、内置日程与多渠道发布于一体</strong>
@@ -6,8 +6,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/版本-v4.0.0-blue" alt="Version">
-  <img src="https://img.shields.io/badge/MaiBot-1.3.x+-green" alt="MaiBot">
-  <img src="https://img.shields.io/badge/License-AGPL--3.0-orange" alt="License">
+  <img src="https://img.shields.io/badge/MaiBot-1.3.x-green" alt="MaiBot">
+  <img src="https://img.shields.io/badge/License-AGPL--3.0--or--later-orange" alt="License">
 </p>
 
 ---
@@ -191,7 +191,11 @@ git clone https://github.com/nguspring/painter_maimai_daily.git
 
 至少准备一个可用的生图接口，例如魔搭、硅基流动、OpenAI 兼容中转、豆包、Gemini 或本地 ComfyUI。
 
-### 3. 填写配置
+### 3. 启用插件
+
+在 MaiBot WebUI 的插件管理中找到「画家麦麦的日常」，确认已启用；首次加载会在插件目录生成 `config.toml`。
+
+### 4. 填写配置
 
 首次启动后会生成 `config.toml`，重点填写：
 
@@ -201,7 +205,7 @@ git clone https://github.com/nguspring/painter_maimai_daily.git
 - `[qzone]`：Cookie 获取方式与 HTTP 地址
 - `[basic]`：命令前缀、管理员、默认模型
 
-### 4. 测试
+### 5. 测试
 
 在 QQ 里发送：
 
@@ -213,6 +217,19 @@ git clone https://github.com/nguspring/painter_maimai_daily.git
 能正常出图和显示日程，说明基础链路已通。
 
 ---
+
+## 权限与能力
+
+插件在 `_manifest.json` 中声明并实际使用以下能力：
+
+- `send.text` / `send.image` / `send.hybrid`：发送文字、图片和混合消息。
+- `config.get`：读取插件配置。
+- `llm.generate`：日程生成、提示词优化与配文。
+- `message.get_by_id` / `message.get_recent`：读取消息与群聊上下文。
+- `chat.get_stream_by_group_id` / `chat.get_stream_by_user_id` / `chat.get_all_streams`：解析聊天流。
+- `api.call` / `api.list`：调用其他插件 API 与适配器能力。
+
+命令权限：`/dr` 生图、`/dr list`、`/dr schedule`、`/dr styles` 对所有用户开放；模型、开关、风格设置、额度调整等管理命令需要 `basic.admin_users` 中配置的 QQ 号。
 
 ## 配置说明
 
@@ -353,7 +370,7 @@ A：不能。v4.0.0 更换了插件 ID 与配置版本，请重新生成后手�
 ## 版权与反馈
 
 - 作者：nguspring
-- 许可证：AGPL-3.0
+- 许可证：AGPL-3.0-or-later
 - 项目主页：https://github.com/nguspring/painter_maimai_daily
 - Issue：https://github.com/nguspring/painter_maimai_daily/issues
 - 联系 QQ：3896597914
