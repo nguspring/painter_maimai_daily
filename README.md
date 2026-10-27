@@ -356,6 +356,6 @@ A：不能。v4.0.0 更换了插件 ID 与配置版本，请重新生成后手�
 - 许可证：AGPL-3.0
 - 项目主页：https://github.com/nguspring/painter_maimai_daily
 - Issue：https://github.com/nguspring/painter_maimai_daily/issues
-- 联系 QQ：1021143806，3082618311
+- 联系 QQ：3896597914
 
 更新日志见 [changelog.md](changelog.md)。
