@@ -23,14 +23,14 @@ from ..result import StepResult
 from ..step import BaseStep
 
 if TYPE_CHECKING:
-    from ...plugin import MaisArtPlugin
+    from ...plugin import PainterMaimaiPlugin
     from ..request import GenerationRequest
     from ..step import PipelineContext
 
-logger = logging.getLogger("plugin.mais_art_journal.step.resolve_model")
+logger = logging.getLogger("plugin.painter_maimai_daily.step.resolve_model")
 
 
-def _resolve_default_model(plugin: "MaisArtPlugin", req: "GenerationRequest") -> str:
+def _resolve_default_model(plugin: "PainterMaimaiPlugin", req: "GenerationRequest") -> str:
     """按「自拍 → 图生图 → 文生图」回退链解析默认模型 ID。"""
     selfie = plugin.config.selfie
 

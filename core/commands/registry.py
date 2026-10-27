@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Awaitable, Callable, Dict, Optional, Tuple
 
 if TYPE_CHECKING:
-    from ..plugin import MaisArtPlugin
+    from ..plugin import PainterMaimaiPlugin
     from .dispatcher import DispatcherContext
 
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 CommandResult = Tuple[bool, Optional[str], bool]
 
 SubCommandHandler = Callable[
-    ["MaisArtPlugin", "DispatcherContext", str],
+    ["PainterMaimaiPlugin", "DispatcherContext", str],
     Awaitable[CommandResult],
 ]
 

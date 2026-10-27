@@ -5,15 +5,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
-    from ...plugin import MaisArtPlugin
+    from ...plugin import PainterMaimaiPlugin
 
 
-def list_styles(plugin: "MaisArtPlugin") -> List[Dict[str, Any]]:
+def list_styles(plugin: "PainterMaimaiPlugin") -> List[Dict[str, Any]]:
     """返回所有风格预设的独立字典副本。"""
     return [item.model_dump(mode="python") for item in plugin.config.styles.items]
 
 
-def resolve_style_alias(plugin: "MaisArtPlugin", input_name: str) -> Optional[str]:
+def resolve_style_alias(plugin: "PainterMaimaiPlugin", input_name: str) -> Optional[str]:
     """根据英文风格名或配置的中文别名查找风格。"""
     needle = str(input_name or "").strip()
     if not needle:
@@ -28,7 +28,7 @@ def resolve_style_alias(plugin: "MaisArtPlugin", input_name: str) -> Optional[st
     return None
 
 
-def get_style_prompt(plugin: "MaisArtPlugin", style_name: str) -> Optional[str]:
+def get_style_prompt(plugin: "PainterMaimaiPlugin", style_name: str) -> Optional[str]:
     """按名称读取风格提示词，不存在或为空时返回 None。"""
     for style in list_styles(plugin):
         if style.get("name") != style_name:
@@ -38,7 +38,7 @@ def get_style_prompt(plugin: "MaisArtPlugin", style_name: str) -> Optional[str]:
     return None
 
 
-def get_style_aliases(plugin: "MaisArtPlugin", style_name: str) -> List[str]:
+def get_style_aliases(plugin: "PainterMaimaiPlugin", style_name: str) -> List[str]:
     """返回指定风格的中文别名列表。"""
     for style in list_styles(plugin):
         if style.get("name") != style_name:

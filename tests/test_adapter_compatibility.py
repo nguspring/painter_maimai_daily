@@ -14,14 +14,14 @@ import sys
 from maibot_sdk import PluginContext
 import pytest
 
-from mais_art_journal.core.config.models import MaisArtConfig
-from mais_art_journal.core.pipeline.request import GenerationRequest
-from mais_art_journal.core.pipeline.steps.schedule_recall import ScheduleRecall
-from mais_art_journal.core.pipeline.steps.send_image import SendImage
-from mais_art_journal.core.utils.image_utils import ImageProcessor
-from mais_art_journal.core.utils.recall_utils import schedule_auto_recall
-from mais_art_journal.core.utils.request_context import RequestContext
-from mais_art_journal.plugin import MaisArtPlugin
+from painter_maimai_daily.core.config.models import PainterMaimaiConfig
+from painter_maimai_daily.core.pipeline.request import GenerationRequest
+from painter_maimai_daily.core.pipeline.steps.schedule_recall import ScheduleRecall
+from painter_maimai_daily.core.pipeline.steps.send_image import SendImage
+from painter_maimai_daily.core.utils.image_utils import ImageProcessor
+from painter_maimai_daily.core.utils.recall_utils import schedule_auto_recall
+from painter_maimai_daily.core.utils.request_context import RequestContext
+from painter_maimai_daily.plugin import PainterMaimaiPlugin
 
 
 SESSION = "registered-qq-session"
@@ -107,7 +107,7 @@ def test_missing_recall_api_skips_without_calling_tools_or_http() -> None:
 
 @pytest.mark.parametrize("scene,mapped_ids", [(scene, mapped) for scene in ("group", "private") for mapped in (True, False)])
 def test_existing_official_gateway_sends_sdk_image_and_skips_auto_recall(scene: str, mapped_ids: bool) -> None:
-    with adapter_module("Mai-with-u_qq-adapter", "_mais_art_test_qq_official") as module:
+    with adapter_module("Mai-with-u_qq-adapter", "_painter_maimai_test_qq_official") as module:
         async def scenario() -> None:
             adapter = module.QQOfficialAdapterPlugin()
             adapter.set_plugin_config(adapter.get_default_config())
@@ -135,8 +135,8 @@ def test_existing_official_gateway_sends_sdk_image_and_skips_auto_recall(scene: 
                 })
                 return {"success": result["success"], "sent": result["success"], "message_id": result.get("external_message_id")}
 
-            plugin = MaisArtPlugin()
-            config = MaisArtConfig()
+            plugin = PainterMaimaiPlugin()
+            config = PainterMaimaiConfig()
             config.basic.auto_recall_enabled = True
             plugin.set_plugin_config(config.model_dump())
             plugin._set_context(PluginContext("art", rpc_call=rpc))
@@ -155,7 +155,7 @@ def test_existing_official_gateway_sends_sdk_image_and_skips_auto_recall(scene: 
 
 @pytest.mark.parametrize("client_type,scene", [(client, scene) for client in ("napcat", "snowluma") for scene in ("group", "private")])
 def test_real_onebot_gateway_accepts_sdk_image_segments(client_type: str, scene: str) -> None:
-    with adapter_module("maibot-team_snowluma-adapter", "_mais_art_test_onebot") as module:
+    with adapter_module("maibot-team_snowluma-adapter", "_painter_maimai_test_onebot") as module:
         adapter = module.SnowLumaAdapterPlugin()
         adapter.set_plugin_config(adapter.get_default_config())
         adapter.config.client.client_type = client_type
@@ -189,7 +189,7 @@ def test_inbound_images_and_quotes_keep_openids(user_id: str, group_id: str) -> 
         message = {"message_id": "trigger-id", "reply_to": "quoted-id", "raw_message": [], "message_info": {
             "user_info": {"user_id": user_id}, "group_info": {"group_id": group_id},
         }}
-        plugin = MaisArtPlugin()
+        plugin = PainterMaimaiPlugin()
         plugin._set_context(SimpleNamespace(message=SimpleNamespace(get_by_id=AsyncMock(return_value={
             "raw_message": [{"type": "image", "binary_data_base64": "offline-image"}],
         }))))

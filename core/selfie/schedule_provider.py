@@ -19,7 +19,9 @@ import time
 if TYPE_CHECKING:
     from maibot_sdk.context import PluginContext
 
-logger = logging.getLogger("plugin.mais_art_journal.schedule")
+    from ...plugin import PainterMaimaiPlugin
+
+logger = logging.getLogger("plugin.painter_maimai_daily.schedule")
 _PLANNING_API_NAME = "Rabbit-Jia-Er.MaiTrace.get_current_activity"
 _TIME_WINDOW_PATTERN = re.compile(r"(\d{1,2}):(\d{2})\s*[-~～至]\s*(\d{1,2}):(\d{2})")
 _BREAK_PATTERN = re.compile(
@@ -335,7 +337,17 @@ class ApiScheduleProvider(ScheduleProvider):
 
 
 def get_schedule_provider(
-    ctx: "PluginContext", chat_id: str = "global", timeout_seconds: float = 20, *, include_life: bool = False,
+    plugin: "PainterMaimaiPlugin", chat_id: str = "global", timeout_seconds: float = 20, *, include_life: bool = False,
 ) -> ScheduleProvider:
-    """只创建 SDK 日程适配器；global 是日程作用域，不是聊天资源归属 ID。"""
-    return ApiScheduleProvider(ctx, chat_id, timeout_seconds, include_life=include_life)
+    """按配置选择日程来源；关闭时返回空实现，不回退到 MaiTrace（D10）。"""
+    schedule = plugin.config.schedule
+    if not schedule.enabled:
+        from ..schedule.provider import NullScheduleProvider
+        return NullScheduleProvider()
+    if schedule.provider == "builtin":
+        manager = plugin.schedule_manager
+        if manager is None:
+            raise RuntimeError("内置日程已启用，但日程管理器尚未初始化")
+        from ..schedule.provider import BuiltinScheduleProvider
+        return BuiltinScheduleProvider(manager)
+    return ApiScheduleProvider(plugin.ctx, chat_id, timeout_seconds, include_life=include_life)

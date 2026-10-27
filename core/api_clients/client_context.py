@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 if TYPE_CHECKING:
-    from ...plugin import MaisArtPlugin
+    from ...plugin import PainterMaimaiPlugin
 
 
 @dataclass
@@ -31,7 +31,7 @@ class ClientContext:
     def __init__(
         self,
         *,
-        log_prefix: str = "[MaisArt]",
+        log_prefix: str = "[PainterMaimai]",
         proxy: Optional[ProxyConfig] = None,
         config_getter: Optional[Callable[[str, Any], Any]] = None,
     ):
@@ -55,11 +55,11 @@ class ClientContext:
 
 
 def build_client_context_from_plugin(
-    plugin: "MaisArtPlugin",
+    plugin: "PainterMaimaiPlugin",
     *,
-    log_prefix: str = "[MaisArt]",
+    log_prefix: str = "[PainterMaimai]",
 ) -> ClientContext:
-    """从 MaisArtPlugin 实例构造 ClientContext
+    """从 PainterMaimaiPlugin 实例构造 ClientContext
 
     Args:
         plugin: 持有 .config.proxy / .get_config 的插件实例

@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from ..request import GenerationRequest
     from ..step import PipelineContext
 
-logger = logging.getLogger("plugin.mais_art_journal.step.update_cache")
+logger = logging.getLogger("plugin.painter_maimai_daily.step.update_cache")
 
 
 class UpdateCache(BaseStep):

@@ -9,7 +9,7 @@ import logging
 if TYPE_CHECKING:
     from maibot_sdk.context import PluginContext
 
-logger = logging.getLogger("plugin.mais_art_journal.size")
+logger = logging.getLogger("plugin.painter_maimai_daily.size")
 
 # LLM 尺寸选择系统提示词
 SIZE_SELECTOR_SYSTEM_PROMPT = """You are an image size selector. Based on the image description, choose the most appropriate size.

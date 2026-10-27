@@ -25,7 +25,7 @@ from ..prompts.prompt_templates import load_prompt_template
 if TYPE_CHECKING:
     from maibot_sdk.context import PluginContext
 
-logger = logging.getLogger("plugin.mais_art_journal.caption")
+logger = logging.getLogger("plugin.painter_maimai_daily.caption")
 
 
 async def _get_reply_style(ctx: "PluginContext") -> str:

@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from ..api_clients import BaseApiClient
     from ..utils import CacheManager, ImageProcessor
     from ..utils.request_context import RequestContext
-    from ...plugin import MaisArtPlugin
+    from ...plugin import PainterMaimaiPlugin
     from .request import GenerationRequest
     from .result import StepResult
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 class PipelineContext:
     """流水线共享上下文（按一次请求构造）"""
 
-    plugin: "MaisArtPlugin"
+    plugin: "PainterMaimaiPlugin"
     cache: "CacheManager"
     image_processor: "ImageProcessor"
     client_factory: Callable[[str], "BaseApiClient"]

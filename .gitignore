@@ -9,7 +9,7 @@ __pycache__/
 test/*
 
 # 忽略特定文件
-config.toml
+/config.toml
 图像到图像（简易）.json
 文生图（效果最好的一个）.json
 .env

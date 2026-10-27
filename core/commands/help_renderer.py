@@ -10,7 +10,7 @@ from .registry import CommandResult
 if TYPE_CHECKING:
     from .dispatcher import DispatcherContext
 
-logger = logging.getLogger("plugin.mais_art_journal.help")
+logger = logging.getLogger("plugin.painter_maimai_daily.help")
 
 
 async def render_help(dctx: "DispatcherContext") -> CommandResult:
@@ -26,6 +26,7 @@ async def render_help(dctx: "DispatcherContext") -> CommandResult:
         f"• {prefix} list - 查看所有模型",
         f"• {prefix} config - 查看当前配置",
         f"• {prefix} quota - 查看本聊天额度",
+        f"• {prefix} schedule - 查看今日日程",
     ]
     if dctx.is_admin:
         lines.extend([
@@ -35,6 +36,7 @@ async def render_help(dctx: "DispatcherContext") -> CommandResult:
             f"• {prefix} recall on|off <模型ID> - 开关撤回",
             f"• {prefix} selfie on|off - 开关自拍日程增强",
             f"• {prefix} selfie auto|standard|mirror|photo - 切换自拍风格",
+            f"• {prefix} schedule regen - 重新生成今日日程",
             f"• {prefix} default <模型ID> - 设置默认模型",
             f"• {prefix} set <模型ID> - 设置命令模型",
             f"• {prefix} style <风格名> - 查看风格详情",

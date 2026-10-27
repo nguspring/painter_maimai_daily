@@ -1,4 +1,4 @@
-"""mais_art_journal 插件冒烟测试
+"""painter_maimai_daily 插件冒烟测试
 
 测试插件的基本功能是否正常工作：
 1. 配置加载
@@ -20,11 +20,11 @@ def test_config_loading():
     """测试配置加载"""
     print("测试 1: 配置加载...")
     try:
-        from core.config.models import MaisArtConfig
+        from core.config.models import PainterMaimaiConfig
 
         # 使用当前 SDK 的默认配置快照，避免依赖本机账号配置。
-        plugin = _load_plugin_module().MaisArtPlugin()
-        config = MaisArtConfig.model_validate(plugin.get_default_config())
+        plugin = _load_plugin_module().PainterMaimaiPlugin()
+        config = PainterMaimaiConfig.model_validate(plugin.get_default_config())
         print("  ✅ 配置加载成功")
         print(f"     - 插件名称: {config.plugin.name}")
         print(f"     - 配置版本: {config.plugin.config_version}")
@@ -44,10 +44,10 @@ def test_model_registry():
     print("\n测试 2: 模型注册表...")
     try:
         from core.config.model_registry import model_exists
-        from core.config.models import MaisArtConfig
+        from core.config.models import PainterMaimaiConfig
 
         # 注册表只读取当前强类型配置。
-        plugin = SimpleNamespace(config=MaisArtConfig())
+        plugin = SimpleNamespace(config=PainterMaimaiConfig())
 
         # 测试存在的模型
         if model_exists(plugin, "model1"):
@@ -76,9 +76,9 @@ def test_style_registry():
     print("\n测试 3: 风格注册表...")
     try:
         from core.config.style_registry import resolve_style_alias, get_style_prompt
-        from core.config.models import MaisArtConfig
+        from core.config.models import PainterMaimaiConfig
 
-        plugin = SimpleNamespace(config=MaisArtConfig())
+        plugin = SimpleNamespace(config=PainterMaimaiConfig())
 
         # 测试风格解析
         style = resolve_style_alias(plugin, "cartoon")
@@ -204,7 +204,7 @@ def _load_plugin_module():
     parent_dir = plugin_dir.parent
     package_name = plugin_dir.name
     sys.path.insert(0, str(parent_dir))
-    return __import__(f"{package_name}.plugin", fromlist=["MaisArtPlugin"])
+    return __import__(f"{package_name}.plugin", fromlist=["PainterMaimaiPlugin"])
 
 
 def test_command_pattern():
@@ -212,9 +212,9 @@ def test_command_pattern():
     print("\n测试 6: /dr 命令 pattern...")
     try:
         import re
-        MaisArtPlugin = _load_plugin_module().MaisArtPlugin
+        PainterMaimaiPlugin = _load_plugin_module().PainterMaimaiPlugin
 
-        command = next(component for component in MaisArtPlugin().get_components() if component["name"] == "dr")
+        command = next(component for component in PainterMaimaiPlugin().get_components() if component["name"] == "dr")
         pattern = command["metadata"]["command_pattern"]
         if not pattern:
             print("  ❌ 取不到 handle_dr 的 command_pattern")
@@ -262,10 +262,10 @@ def test_tool_schema_and_request_defaults():
     """测试 Tool schema 的 msg_id 必填，以及 GenerationRequest 默认 source='tool'"""
     print("\n测试 7: Tool schema / GenerationRequest 默认值...")
     try:
-        MaisArtPlugin = _load_plugin_module().MaisArtPlugin
+        PainterMaimaiPlugin = _load_plugin_module().PainterMaimaiPlugin
         from core.pipeline.request import GenerationRequest
 
-        params = MaisArtPlugin._DRAW_TOOL_PARAMETERS
+        params = PainterMaimaiPlugin._DRAW_TOOL_PARAMETERS
         if "msg_id" not in params:
             print("  ❌ _DRAW_TOOL_PARAMETERS 缺少 msg_id 字段")
             return False
@@ -290,7 +290,7 @@ def test_tool_schema_and_request_defaults():
 
 def main():
     print("=" * 60)
-    print("mais_art_journal 插件冒烟测试")
+    print("painter_maimai_daily 插件冒烟测试")
     print("=" * 60)
 
     results = []

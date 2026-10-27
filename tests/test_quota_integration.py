@@ -12,14 +12,14 @@ import asyncio
 import base64
 import pytest
 
-from mais_art_journal.core.config.models import MaisArtConfig
-from mais_art_journal.core.pipeline import Pipeline
-from mais_art_journal.core.pipeline.request import GenerationRequest
-from mais_art_journal.core.pipeline.result import StepResult
-from mais_art_journal.core.pipeline.steps.send_image import SendImage
-from mais_art_journal.core.quota import QuotaPolicy, QuotaSubject
-from mais_art_journal.core.quota.service import resolve_quota_context
-from mais_art_journal.plugin import MaisArtPlugin
+from painter_maimai_daily.core.config.models import PainterMaimaiConfig
+from painter_maimai_daily.core.pipeline import Pipeline
+from painter_maimai_daily.core.pipeline.request import GenerationRequest
+from painter_maimai_daily.core.pipeline.result import StepResult
+from painter_maimai_daily.core.pipeline.steps.send_image import SendImage
+from painter_maimai_daily.core.quota import QuotaPolicy, QuotaSubject
+from painter_maimai_daily.core.quota.service import resolve_quota_context
+from painter_maimai_daily.plugin import PainterMaimaiPlugin
 
 
 SESSION = "host-registered-group-session"
@@ -28,8 +28,8 @@ SUBJECT = QuotaSubject("qq", "group", "1001")
 POLICY = QuotaPolicy(1)
 
 
-async def open_plugin(path: Path, *, limit: int = 1) -> MaisArtPlugin:
-    config = MaisArtConfig()
+async def open_plugin(path: Path, *, limit: int = 1) -> PainterMaimaiPlugin:
+    config = PainterMaimaiConfig()
     config.plugin.enabled = True
     config.basic.admin_users = ["admin"]
     config.basic.prompt_optimizer_enabled = False
@@ -37,7 +37,7 @@ async def open_plugin(path: Path, *, limit: int = 1) -> MaisArtPlugin:
     config.quota.enabled = True
     config.quota.group_limit = limit
     config.quota.private_limit = limit
-    plugin = MaisArtPlugin()
+    plugin = PainterMaimaiPlugin()
     plugin._plugin_dir = str(path)
     plugin.set_plugin_config(config.model_dump(mode="json"))
     plugin._set_context(SimpleNamespace(
@@ -310,7 +310,7 @@ def test_native_novelai_public_api_returns_image_without_chat_quota(tmp_path: Pa
         def iter_content(self, chunk_size: int) -> Any:
             yield png
     http = Mock(return_value=Response())
-    monkeypatch.setattr("mais_art_journal.core.api_clients.novelai_client.requests.post", http)
+    monkeypatch.setattr("painter_maimai_daily.core.api_clients.novelai_client.requests.post", http)
 
     async def scenario() -> None:
         plugin = await open_plugin(tmp_path)
@@ -350,8 +350,8 @@ def test_unload_drains_active_tool_and_finishes_accounting_before_close(tmp_path
             return await real_settle(*args)
         plugin.ctx.send.image.side_effect = blocked_send
         plugin._action_pipeline = Pipeline([generated_step(), SendImage()])
-        monkeypatch.setattr("mais_art_journal.core.pipeline.build_request_from_tool_kwargs", AsyncMock(return_value=req))
-        monkeypatch.setattr("mais_art_journal.core.pipeline.make_pipeline_context", lambda plugin, req: SimpleNamespace(plugin=plugin))
+        monkeypatch.setattr("painter_maimai_daily.core.pipeline.build_request_from_tool_kwargs", AsyncMock(return_value=req))
+        monkeypatch.setattr("painter_maimai_daily.core.pipeline.make_pipeline_context", lambda plugin, req: SimpleNamespace(plugin=plugin))
         monkeypatch.setattr(plugin.quota_store, "settle", delayed_settle)
         running = asyncio.create_task(plugin.handle_draw_picture())
         await sending.wait()
@@ -381,7 +381,7 @@ def test_unload_drains_active_tool_and_finishes_accounting_before_close(tmp_path
 
 
 def test_sdk_metadata_survives_operation_tracking() -> None:
-    plugin = MaisArtPlugin()
+    plugin = PainterMaimaiPlugin()
     components = {item["name"]: item for item in plugin.get_components()}
     assert components["generate_image"]["metadata"]["timeout_ms"] == 660000
     assert components["draw_picture"]["metadata"]["timeout_ms"] == 660000
@@ -408,7 +408,7 @@ def test_unload_prevents_concurrent_config_reload_from_restarting_tasks(tmp_path
                     pass
         task = SimpleNamespace(start=AsyncMock(), stop=stop)
         plugin._auto_selfie_task = task
-        reloading = asyncio.create_task(plugin.on_config_update("self", config, "4.4.0"))
+        reloading = asyncio.create_task(plugin.on_config_update("self", config, "3.4.0"))
         await stopping.wait()
         await plugin.on_unload()
         await reloading

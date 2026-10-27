@@ -14,14 +14,14 @@ from ..help_renderer import render_current_config
 from ..registry import CommandResult, subcommand
 
 if TYPE_CHECKING:
-    from ....plugin import MaisArtPlugin
+    from ....plugin import PainterMaimaiPlugin
     from ..dispatcher import DispatcherContext
 
-logger = logging.getLogger("plugin.mais_art_journal.cmd.config")
+logger = logging.getLogger("plugin.painter_maimai_daily.cmd.config")
 
 
 @subcommand("list", aliases=("models",), admin=False)
-async def cmd_list(plugin: "MaisArtPlugin", dctx: "DispatcherContext", args: str) -> CommandResult:
+async def cmd_list(plugin: "PainterMaimaiPlugin", dctx: "DispatcherContext", args: str) -> CommandResult:
     """/dr list ｜ /dr models — 列出所有模型（管理员可见禁用模型）"""
     models = list_models(plugin)
     if not models:
@@ -67,13 +67,13 @@ async def cmd_list(plugin: "MaisArtPlugin", dctx: "DispatcherContext", args: str
 
 
 @subcommand("config", admin=True)
-async def cmd_config(plugin: "MaisArtPlugin", dctx: "DispatcherContext", args: str) -> CommandResult:
+async def cmd_config(plugin: "PainterMaimaiPlugin", dctx: "DispatcherContext", args: str) -> CommandResult:
     """/dr config — 显示当前聊天流配置"""
     return await render_current_config(dctx)
 
 
 @subcommand("set", admin=True)
-async def cmd_set(plugin: "MaisArtPlugin", dctx: "DispatcherContext", args: str) -> CommandResult:
+async def cmd_set(plugin: "PainterMaimaiPlugin", dctx: "DispatcherContext", args: str) -> CommandResult:
     """/dr set <模型ID> — 设置 /dr 命令使用的模型"""
     model_id = args.strip()
     if not model_id:
@@ -96,7 +96,7 @@ async def cmd_set(plugin: "MaisArtPlugin", dctx: "DispatcherContext", args: str)
 
 
 @subcommand("default", admin=True)
-async def cmd_default(plugin: "MaisArtPlugin", dctx: "DispatcherContext", args: str) -> CommandResult:
+async def cmd_default(plugin: "PainterMaimaiPlugin", dctx: "DispatcherContext", args: str) -> CommandResult:
     """/dr default <模型ID> — 设置 Action 组件默认模型"""
     model_id = args.strip()
     if not model_id:
@@ -117,7 +117,7 @@ async def cmd_default(plugin: "MaisArtPlugin", dctx: "DispatcherContext", args: 
 
 
 @subcommand("reset", admin=True)
-async def cmd_reset(plugin: "MaisArtPlugin", dctx: "DispatcherContext", args: str) -> CommandResult:
+async def cmd_reset(plugin: "PainterMaimaiPlugin", dctx: "DispatcherContext", args: str) -> CommandResult:
     """/dr reset — 删除当前聊天流的持久化覆盖项，恢复当前全局配置。"""
     await plugin.runtime_state.reset_chat_state(dctx.chat_id)
     global_txt2img = resolve_txt2img_model(plugin)

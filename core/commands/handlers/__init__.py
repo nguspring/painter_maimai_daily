@@ -6,6 +6,7 @@ dispatcher 通过 `from . import handlers` 加载此包，
 
 from . import config_handlers  # noqa: F401
 from . import quota_handlers  # noqa: F401
+from . import schedule_handlers  # noqa: F401
 from . import selfie_handlers  # noqa: F401
 from . import style_handlers  # noqa: F401
 from . import toggle_handlers  # noqa: F401

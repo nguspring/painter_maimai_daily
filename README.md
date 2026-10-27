@@ -1,6 +1,6 @@
-# 麦麦绘卷 (Claude MAInet) - 智能多模型图片生成插件
+﻿# 画家麦麦的日常 (Painter Maimai's Daily Life) - 智能多模型图片生成插件
 
-基于 MaiBot 的智能多模型图片生成插件，支持文生图和图生图自动识别。兼容原生 NovelAI、OpenAI、OpenAI-Chat、豆包（火山方舟）、Gemini、魔搭、硅基流动、砂糖云、梦羽、智谱 GLM、阿里百炼 DashScope（通义千问/万相/Z-Image/可灵）、ComfyUI 等多种 API 格式。提供日程自拍、群聊主动图片、聊天设置持久化、群/私聊额度管理、对外生图 API 等功能，与 MaiTrace 双向配合。
+基于 MaiBot 的智能多模型图片生成插件，支持文生图和图生图自动识别。兼容原生 NovelAI、OpenAI、OpenAI-Chat、豆包（火山方舟）、Gemini、魔搭、硅基流动、砂糖云、梦羽、智谱 GLM、阿里百炼 DashScope（通义千问/万相/Z-Image/可灵）、ComfyUI 等多种 API 格式。提供内置日程与日程注入、空间/群/私聊多渠道自动自拍、群聊主动图片、聊天设置持久化、群/私聊额度管理、对外生图 API 等功能，可选对接 MaiTrace。
 
 ## ✨ 主要特性
 
@@ -29,6 +29,7 @@
 |------|------|
 | `/dr styles` | 列出所有可用风格 |
 | `/dr style <名>` | 查看风格详情 |
+| `/dr schedule` | 查看当前活动和今天全部日程 |
 | `/dr help` | 帮助信息 |
 
 #### 配置管理（需管理员权限）
@@ -44,6 +45,7 @@
 | `/dr on` / `/dr off` | 开关插件（当前聊天流） |
 | `/dr selfie on\|off` | 开关自拍日程增强（当前聊天流） |
 | `/dr selfie auto\|standard\|mirror\|photo` | 切换自拍风格（当前聊天流） |
+| `/dr schedule regen` | 用 LLM 重新生成今日日程 |
 | `/dr reset` | 重置当前聊天流的所有运行时配置 |
 
 > 模型切换、插件/模型/撤回开关、自拍日程开关和自拍风格按宿主真实聊天流保存，重启后继续生效。没有设置覆盖的聊天流跟随全局配置；`/dr reset` 只清除当前聊天流的设置覆盖，不重置生图额度。
@@ -60,13 +62,24 @@
 
 额度默认关闭。启用后，用户发起的智能 Tool、风格命令和自然语言命令共用一套额度；同一群内所有用户共享，私聊按用户单独计算。每张成功发送的图片（含缓存图片）计一次，管理员也照常计数。
 
-### 自动自拍与群聊主动图片
+### 内置日程与日程注入
 
-根据 MaiTrace 当前日程、生活状态、人设和群话题，决定分享自拍到 QQ 空间、一个允许群，或跳过本轮。
+默认使用插件自带的 SQLite 日程库，无需安装 MaiTrace；也可把 `schedule.provider` 改回 `maitrace` 复用外部日程。
 
+- 每天先用模板兜底，再由 LLM 结合人设、兴趣、生活习惯和历史日程生成；质量不达标时按配置多轮重试
+- 日程按 `schedule.timezone` 统一计算，支持跨午夜活动；`/dr schedule` 查看当天日程，管理员可用 `/dr schedule regen` 重新生成
+- 规划器和回复器通过命名 Hook 读取内存快照注入当前活动，不查库、不调 LLM；带固定标记去重，可用意图分类、时间冷却、消息数阈值和会话白名单控制频率
+- 关闭 `schedule.enabled` 后所有主动任务视为无日程，不会静默回退到 MaiTrace
+
+### 多渠道自动自拍与群聊主动图片
+
+根据当前日程、人设和群话题，决定分享图文自拍到 QQ 空间、多个允许群和私聊名单，或跳过本轮。
+
+- 同一轮只生成一张图；每个渠道独立冷却、独立预占、独立结算，空间失败不会阻断群和私聊
 - 自动自拍默认每 20 分钟判断一次，发布冷却 2 小时，00:00–07:00 静默；群话题图片另有概率和冷却设置
-- 自拍由 LLM 一次生成场景、服装与构图，配文依据实际生成方案与人设；群自拍一次发送图文，生成或配文失败则跳过
+- 配文可按 `selfie.caption_mode` 共用一条或按渠道分别生成；关闭配文时使用固定文案
 - 判断不发不占发布冷却；临发送重新查日程，活动、地点、服装或生活场景变化时丢弃结果，连续失败会延长重试间隔
+- 空间发布由插件自行完成：通过适配器 / NapCat HTTP / 本地缓存获取 Cookie，只发图文说说，不依赖 MaiTrace
 
 ---
 
@@ -95,19 +108,19 @@
    cd MaiBot/plugins
    ```
 
-2. 克隆本仓库，指定目录名为 `mais_art_journal`：
+2. 克隆本仓库，指定目录名为 `painter_maimai_daily`：
 
    ```shell
-   git clone https://github.com/1021143806/mais-art-journal.git mais_art_journal
+   git clone https://github.com/nguspring/selfie_painter.git painter_maimai_daily
    ```
 
 3. 在 MaiBot 使用的 Python 环境中安装插件依赖：
 
    ```shell
-   uv pip install -r mais_art_journal/requirements.txt
+   uv pip install -r painter_maimai_daily/requirements.txt
    ```
 
-4. 重启 MaiBot，插件会在 `MaiBot/plugins/mais_art_journal/` 生成 `config.toml`。
+4. 重启 MaiBot，插件会在 `MaiBot/plugins/painter_maimai_daily/` 生成 `config.toml`。
 5. 按下方说明配置生图模型和辅助 LLM，重启 MaiBot 后用 `/dr 画一只猫` 验证。API Key 从对应服务商申请（如何申请 key 请自行前往对应平台官网查看 api 文档）
 
 ## 配置说明
@@ -119,7 +132,7 @@
 ```toml
 [plugin]
 enabled = true                    # 启用插件
-config_version = "4.6.3"          # 插件配置版本，自动维护，请勿改
+config_version = "4.0.0"          # 插件配置版本，自动维护，请勿改
 
 [basic]
 command_prefix = "/dr"            # 命令前缀，可改 /dv、/draw 等，必须以 / 开头
@@ -328,35 +341,102 @@ period = "weekly"               # 省略时使用全局周期
 | `selfie.auto_enabled` | 定时自动自拍开关，默认关闭 |
 | `selfie.selfie_model` | 自动自拍模型；留空沿用普通自拍模型 |
 | `selfie.qzone_enabled` / `selfie.group_enabled` | 自动自拍允许发到空间 / 群 |
+| `selfie.private_enabled` / `selfie.private_user_ids` | 自动自拍允许发私聊，并填写接收者实际用户 ID |
+| `selfie.caption_mode` | `shared` 多目标共用一条配文；`per_channel` 按渠道分别生成 |
 | `selfie.check_interval_minutes` / `selfie.interval_minutes` | 自动自拍判断间隔 / 发布冷却，默认 20 / 120 分钟 |
 | `group_image.enabled` | 群话题主动生图开关，默认关闭 |
 | `group_image.platform` / `group_image.group_ids` | 主动发群使用的平台与允许群 ID 名单 |
 | `group_image.model_id` | 群话题图片使用的模型 |
 | `group_image.probability` / `group_image.cooldown_minutes` | 群话题生图概率 / 每群发布冷却 |
 
-自动自拍、聊天自拍和 MaiTrace 自拍共用形象与参考图；服装按活动调整。主动发图需要 MaiTrace 的有效日程，睡眠、低精力或静默时段会跳过。
+自动自拍、聊天自拍和外部 API 自拍共用形象与参考图；服装按活动调整。主动发图需要有效日程（默认读内置日程，`provider=maitrace` 时读 MaiTrace），睡眠、低精力或静默时段会跳过。
 
-自动自拍发群与群话题图片共用群名单和群冷却；只发定时自拍时无需开启 `group_image.enabled`。空间发布需先在 MaiTrace 配好空间接口或 Cookie。关闭 `selfie.caption_enabled` 后，`selfie.caption_text` 必须填写固定配文。
+自动自拍发群与群话题图片共用群名单和群冷却；只发定时自拍时无需开启 `group_image.enabled`。空间发布由插件自研链路完成，无需 MaiTrace 的空间接口。关闭 `selfie.caption_enabled` 后，`selfie.caption_text` 必须填写固定配文。
+
+### 内置日程配置
+
+```toml
+[schedule]
+enabled = true                    # 关闭后主动任务视为无日程，也不会回退 MaiTrace
+provider = "builtin"              # builtin / maitrace
+timezone = "Asia/Shanghai"        # 生成与判断统一使用的 IANA 时区
+llm_task_name = "planner"         # 主程序已配置的文本任务名
+generation_timeout_seconds = 180  # 单日生成总超时
+max_tokens = 8192
+multi_round = true
+max_rounds = 2
+quality_threshold = 0.8
+min_activities = 8
+max_activities = 15
+auto_generate_time = "00:30"      # 每日自动生成时刻（schedule.timezone）
+template_mode = "auto"            # auto 按工作日/周末；rest_day 为保留值
+history_days = 3
+retention_days = 30
+snapshot_refresh_seconds = 60     # 内存快照刷新间隔
+schedule_identity = ""            # 身份补充
+schedule_interest = ""            # 兴趣爱好
+schedule_lifestyle = ""           # 生活习惯
+custom_prompt = ""                # 追加到生成提示词的要求
+```
+
+日程库固定写入 SDK 数据目录的 `schedule.db`；删除该文件会回到模板日程。
+
+### 日程注入配置
+
+```toml
+[inject]
+enabled = true
+inject_into_planner = true        # 规划器追加日程背景
+inject_into_replyer = true        # 回复器追加 extra_prompt
+enable_intent_classification = true
+enable_state_analysis = true
+enable_inject_optimization = true
+casual_chat_inject_probability = 0.5
+context_max_turns = 3
+context_ttl_seconds = 600
+max_future_activities = 3
+min_seconds = 300                 # 两次注入最小间隔
+min_messages = 5                  # 冷却期内至少新增消息数
+allowed_streams = []              # 留空不限；填写后只注入这些 session_id
+```
+
+### QQ 空间发布配置
+
+```toml
+[qzone]
+enabled = true
+cookie_methods = ["adapter", "napcat", "local"]  # 按顺序尝试
+http_host = "127.0.0.1"
+http_port = "9999"
+http_token = ""
+adapter_priority = []             # 优先适配器 plugin_id 或后缀
+cookie_ttl_hours = 6
+publish_timeout_seconds = 30
+```
+
+Cookie 有效时写入数据目录 `qzone_cookies-<uin>.json`；获取失败只会跳过空间渠道，群和私聊仍会发送。`uncertain`（网络中断、缺少动态 ID）不会自动重发，避免重复说说。
 
 ### QQ 适配器
 
-支持 QQ 官方、SnowLuma／NapCat，通过宿主统一收发。管理员、额度目标和允许群名单均填实际聊天 ID：官方适配器未绑定时用 OpenID，绑定后用 QQ 号／群号。自动撤回支持 SnowLuma／NapCat，官方消息会跳过。
+支持 QQ 官方、SnowLuma／NapCat，通过宿主统一收发。管理员、额度目标和允许群名单均填实际聊天 ID：官方适配器未绑定时用 OpenID，绑定后用 QQ 号／群号。自动撤回支持 SnowLuma／NapCat，官方消息会跳过。空间 Cookie 会优先通过适配器的 `account.get_cookies` 获取。
 
 ## 与 MaiTrace 配合
 
-[MaiTrace](https://github.com/Rabbit-Jia-Er/MaiTrace)（麦时迹）为主动发图提供当前日程，可选提供生活状态，并通过直发接口发布自拍到 QQ 空间。所有主动发图需要它提供有效日程；手动生图可独立使用。
+[MaiTrace](https://github.com/Rabbit-Jia-Er/MaiTrace)（麦时迹）现在是可选的日程来源：把 `schedule.provider` 设为 `maitrace` 后，主动发图会读取它的公开日程 API 和可选生活状态；默认的 `builtin` 模式完全独立运行。空间发布已由绘卷自研链路负责，不再调用 MaiTrace 的直发接口。
+
+从旧版升级时，原有 `selfie.auto_enabled`、群名单、冷却和额度设置继续生效；新增的 `schedule` / `inject` / `qzone` 段会在首次加载时自动补齐默认值。
 
 其他插件可通过公开 API 获取图片，自行决定如何发送：
 
 ```python
 result = await ctx.call_capability(
     "api.call", timeout_ms=185000,
-    api_name="1021143806.mais_art_journal.generate_image", version="1",
+    api_name="nguspring.painter_maimai_daily.generate_image", version="1",
     args={"prompt": "公园里的猫", "model_id": "model1"},
 )
 ```
 
-返回 `success`、`image_base64`、`model_id`、`size`、`is_img2img`、`error`、`selfie_style` 和 `outfit`；图片为纯 base64。自拍传入 `selfie_mode=true`，可选传构图、活动和服装；模型列表接口为 `1021143806.mais_art_journal.list_image_models`。
+返回 `success`、`image_base64`、`model_id`、`size`、`is_img2img`、`error`、`selfie_style` 和 `outfit`；图片为纯 base64。自拍传入 `selfie_mode=true`，可选传构图、活动和服装；模型列表接口为 `nguspring.painter_maimai_daily.list_image_models`。
 
 ## 💡 使用示例
 
@@ -400,7 +480,8 @@ result = await ctx.call_capability(
 ## 🔧 依赖说明
 
 - 插件需 Python 3.12+，同时遵循所用 MaiBot 版本的 Python 要求
-- 依赖 MaiBot 项目插件系统，目前改为一直支持最新版
+- 依赖 MaiBot 项目插件系统与 `maibot-plugin-sdk>=2.15,<3`
+- 内置日程、注入和 QQ 空间发布依赖 `httpx`、`tzdata`、`tomlkit` 等，启动时会按 manifest 自动检查
 - MaiBot 项目地址：https://github.com/Mai-with-u/MaiBot
 - 如果使用豆包（火山方舟）API，需要安装豆包 SDK
 
@@ -433,7 +514,7 @@ API 返回错误时，先查看日志中的服务端 `message`：
 
 ## 贡献和反馈
 
-- **制作者水平有限，任何漏洞、疑问或建议,欢迎提交 [Issue](https://github.com/1021143806/mais-art-journal/issues) 或 Pull Request！**
+- **制作者水平有限，任何漏洞、疑问或建议,欢迎提交 [Issue](https://github.com/nguspring/selfie_painter/issues) 或 Pull Request！**
 - **作者QQ：1021143806,3082618311或群1025591815（部分请求可能被过滤导致回复不及时，请见谅）**
 - **其余问题请联系作者修复或解决**
 
@@ -456,4 +537,4 @@ API 返回错误时，先查看日志中的服务端 `message`：
 
 - 作者：Ptrel, Rabbit-Jia-Er, saberlights Kiuon
 - 许可证：AGPL-3.0-or-later
-- 项目主页：https://github.com/1021143806/mais-art-journal
+- 项目主页：https://github.com/nguspring/selfie_painter

@@ -1,4 +1,4 @@
-"""mais_art_journal 共享常量"""
+"""painter_maimai_daily 共享常量"""
 
 # Base64 图片格式前缀，用于区分 base64 数据与 URL
 # JPEG: /9j/  PNG: iVBORw  WEBP: UklGR  GIF: R0lGOD

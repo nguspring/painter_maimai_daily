@@ -11,7 +11,7 @@ import sqlite3
 import tempfile
 
 
-logger = logging.getLogger("plugin.mais_art_journal.migration")
+logger = logging.getLogger("plugin.painter_maimai_daily.migration")
 _MIGRATION_MARKER = ".migrated_from_plugin_data_v1"
 _DATA_FILES = ("session_settings.json", "quota.sqlite3")
 

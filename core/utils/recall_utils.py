@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from maibot_sdk import PluginContext
 
 
-logger = logging.getLogger("plugin.mais_art_journal.recall")
+logger = logging.getLogger("plugin.painter_maimai_daily.recall")
 
 
 @dataclass(frozen=True)
@@ -89,4 +89,4 @@ async def schedule_auto_recall(
         except Exception:
             logger.exception("%s 撤回 API 调用异常，message_id=%s", log_prefix, message_id)
 
-    return asyncio.create_task(recall(), name=f"mais-art:recall:{message_id}")
+    return asyncio.create_task(recall(), name=f"painter-maimai:recall:{message_id}")

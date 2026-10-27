@@ -5,7 +5,7 @@ from typing import Dict, Any, Tuple, Optional
 
 from .client_context import ClientContext
 
-logger = logging.getLogger("plugin.mais_art_journal.api")
+logger = logging.getLogger("plugin.painter_maimai_daily.api")
 
 
 class NonRetryableError(Exception):

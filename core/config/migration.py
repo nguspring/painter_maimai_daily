@@ -16,7 +16,7 @@ from maibot_sdk.config import extract_plugin_config_version, rebuild_plugin_conf
 import tomlkit
 
 from .backup import backup_config_if_version_changed
-from .models import BasicSection, MaisArtConfig, SelfieSection
+from .models import BasicSection, PainterMaimaiConfig, SelfieSection
 from .novelai import NOVELAI_FIELD_NAMES, NovelAIConfig
 
 
@@ -136,7 +136,7 @@ def normalize_config_for_upgrade(
     config_data: Optional[Mapping[str, Any]],
 ) -> Tuple[Dict[str, Any], bool]:
     """仅在配置入口转换旧结构；运行时始终使用当前版本的强类型配置。"""
-    defaults = MaisArtConfig().model_dump(mode="python")
+    defaults = PainterMaimaiConfig().model_dump(mode="python")
     if not config_data:
         return defaults, True
     current_version = extract_plugin_config_version(config_data)
@@ -151,7 +151,7 @@ def normalize_config_for_upgrade(
     _convert_styles(migrated)
     # 必须先改名和转结构，再交给 SDK 移除废弃字段、补齐默认值和更新版本号。
     rebuilt = rebuild_plugin_config_data(defaults, migrated)
-    normalized = MaisArtConfig.model_validate(rebuilt).model_dump(mode="python")
+    normalized = PainterMaimaiConfig.model_validate(rebuilt).model_dump(mode="python")
     return normalized, normalized != config_data
 
 

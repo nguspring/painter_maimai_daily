@@ -15,22 +15,22 @@ from maibot_sdk.config import rebuild_plugin_config_data
 import pytest
 import tomlkit
 
-from mais_art_journal.core.config import migration as config_migration
-from mais_art_journal.core.config.migration import normalize_config_for_upgrade, upgrade_config_file
-from mais_art_journal.core.config.models import MaisArtConfig
-from mais_art_journal.core.pipeline.request import GenerationRequest
-from mais_art_journal.core.pipeline.steps.schedule_recall import ScheduleRecall
-from mais_art_journal.core.pipeline.steps.send_image import SendImage
-from mais_art_journal.core.quota import QuotaPolicy, QuotaStore, QuotaSubject
-from mais_art_journal.core.state import RuntimeStateManager
-from mais_art_journal.core.state import migration as data_migration
-from mais_art_journal.core.state.migration import migrate_plugin_data
-from mais_art_journal.core.utils.image_utils import ImageProcessor
-from mais_art_journal.core.utils.request_context import RequestContext
-from mais_art_journal.plugin import MaisArtPlugin, _extract_display_names, _looks_like_quoted_command, create_plugin
+from painter_maimai_daily.core.config import migration as config_migration
+from painter_maimai_daily.core.config.migration import normalize_config_for_upgrade, upgrade_config_file
+from painter_maimai_daily.core.config.models import PainterMaimaiConfig
+from painter_maimai_daily.core.pipeline.request import GenerationRequest
+from painter_maimai_daily.core.pipeline.steps.schedule_recall import ScheduleRecall
+from painter_maimai_daily.core.pipeline.steps.send_image import SendImage
+from painter_maimai_daily.core.quota import QuotaPolicy, QuotaStore, QuotaSubject
+from painter_maimai_daily.core.state import RuntimeStateManager
+from painter_maimai_daily.core.state import migration as data_migration
+from painter_maimai_daily.core.state.migration import migrate_plugin_data
+from painter_maimai_daily.core.utils.image_utils import ImageProcessor
+from painter_maimai_daily.core.utils.request_context import RequestContext
+from painter_maimai_daily.plugin import PainterMaimaiPlugin, _extract_display_names, _looks_like_quoted_command, create_plugin
 
 
-CURRENT_VERSION = MaisArtConfig().plugin.config_version
+CURRENT_VERSION = PainterMaimaiConfig().plugin.config_version
 SESSION = "host-registered-session"
 RECALL_API = {
     "name": "adapter.napcat.message.delete_msg",
@@ -65,7 +65,7 @@ def test_split_sections_preserve_settings_models_and_style_aliases() -> None:
     original = deepcopy(old)
     normalized, changed = normalize_config_for_upgrade(old)
     assert changed and old == original
-    config = MaisArtConfig.model_validate(normalized)
+    config = PainterMaimaiConfig.model_validate(normalized)
     assert config.plugin.config_version == CURRENT_VERSION and config.plugin.enabled
     assert config.basic.default_txt2img_model == "custom"
     assert config.basic.pic_command_model == "custom" and not config.basic.enable_pic_command
@@ -83,19 +83,19 @@ def test_split_sections_preserve_settings_models_and_style_aliases() -> None:
     assert not model.support_img2img
     style, = config.styles.items
     assert (style.name, style.prompt, style.aliases) == ("custom-style", "my original prompt", "自定义,原风格")
-    assert set(normalized) == set(MaisArtConfig.model_fields)
+    assert set(normalized) == set(PainterMaimaiConfig.model_fields)
     assert "default_model" not in normalized["basic"]
 
 
 @pytest.mark.parametrize("version,models,styles", [
     ("4.0.0", {"custom": {"api_key": "key"}}, {"special": "prompt"}),
-    ("4.1.0", [{"id": "custom", "api_key": "key"}], [{"name": "special", "prompt": "prompt"}]),
-    ("4.2.1", {"items": [{"id": "custom", "api_key": "key"}]}, {"items": [{"name": "special", "prompt": "prompt"}]}),
+    ("3.1.0", [{"id": "custom", "api_key": "key"}], [{"name": "special", "prompt": "prompt"}]),
+    ("3.2.1", {"items": [{"id": "custom", "api_key": "key"}]}, {"items": [{"name": "special", "prompt": "prompt"}]}),
 ])
 def test_each_released_collection_shape_upgrades_without_defaults_replacing_it(
     version: str, models: object, styles: object,
 ) -> None:
-    plugin = MaisArtPlugin()
+    plugin = PainterMaimaiPlugin()
     plugin.set_plugin_config({
         "plugin": {"config_version": version}, "basic": {"default_model": "custom"},
         "models": models, "styles": styles, "style_aliases": {"special": "特殊"},
@@ -105,13 +105,13 @@ def test_each_released_collection_shape_upgrades_without_defaults_replacing_it(
     assert [item.name for item in plugin.config.styles.items] == ["special"]
     assert plugin.config.styles.items[0].aliases == "特殊"
     assert plugin.config.basic.default_txt2img_model == "custom"
-    assert "default_model" not in MaisArtConfig.model_fields["basic"].annotation.model_fields
+    assert "default_model" not in PainterMaimaiConfig.model_fields["basic"].annotation.model_fields
     assert normalize_config_for_upgrade(plugin.get_plugin_config_data())[1] is False
 
 
 def test_new_fields_take_precedence_and_intentionally_empty_lists_stay_empty() -> None:
     normalized, _ = normalize_config_for_upgrade({
-        "plugin": {"config_version": "4.2.1"},
+        "plugin": {"config_version": "3.2.1"},
         "generation": {"default_model": "old"}, "cache": {"enabled": True},
         "basic": {"default_txt2img_model": "new", "cache_enabled": False, "admin_users": []},
         "auto_selfie": {"enabled": True, "selfie_style": "mirror"},
@@ -126,7 +126,7 @@ def test_new_fields_take_precedence_and_intentionally_empty_lists_stay_empty() -
 
 
 def test_same_version_legacy_default_is_migrated_before_sdk_rebuild() -> None:
-    data = MaisArtConfig().model_dump(mode="python")
+    data = PainterMaimaiConfig().model_dump(mode="python")
     data["basic"]["default_model"] = "already-customized"
     normalized, changed = normalize_config_for_upgrade(data)
     assert changed and normalized["basic"]["default_txt2img_model"] == "already-customized"
@@ -142,7 +142,7 @@ def test_factory_upgrades_before_host_can_discard_old_keys(tmp_path: Path, monke
     ).encode("utf-8")
     path = tmp_path / "config.toml"
     path.write_bytes(original)
-    monkeypatch.setattr(MaisArtPlugin, "plugin_dir", property(lambda self: str(tmp_path)))
+    monkeypatch.setattr(PainterMaimaiPlugin, "plugin_dir", property(lambda self: str(tmp_path)))
     plugin = create_plugin()
     # 对应当前宿主的实际顺序：先重建，再调用插件 normalize/set_plugin_config。
     disk = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -163,10 +163,10 @@ def test_factory_upgrades_before_host_can_discard_old_keys(tmp_path: Path, monke
     '',
     '# empty config\n',
     '[basic]\ndefault_model="custom"\n',
-    '[plugin]\nconfig_version="4.2.1"\n[models.custom]\nguidance_scale=-9\n',
+    '[plugin]\nconfig_version="3.2.1"\n[models.custom]\nguidance_scale=-9\n',
     '[plugin]\nconfig_version="99.0.0"\n',
     '[plugin]\nconfig_version=""\n',
-    '[plugin]\nconfig_version="4.2.1"\n[models]\nitems="invalid"\n',
+    '[plugin]\nconfig_version="3.2.1"\n[models]\nitems="invalid"\n',
     'not valid toml',
 ])
 def test_invalid_or_newer_config_is_not_replaced(tmp_path: Path, content: str) -> None:
@@ -181,7 +181,7 @@ def test_invalid_or_newer_config_is_not_replaced(tmp_path: Path, content: str) -
 @pytest.mark.parametrize("failure", ["backup", "replace"])
 def test_upgrade_write_failure_keeps_original(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str) -> None:
     path = tmp_path / "config.toml"
-    original = b'[plugin]\nconfig_version="4.2.1"\n[basic]\ndefault_model="custom"\n'
+    original = b'[plugin]\nconfig_version="3.2.1"\n[basic]\ndefault_model="custom"\n'
     path.write_bytes(original)
 
     def reject(*args: object, **kwargs: object) -> None:
@@ -342,7 +342,7 @@ def test_current_sdk_image_and_quote_handling_uses_rpc_dicts() -> None:
     assert _looks_like_quoted_command(message, "/dr")
 
     async def scenario() -> None:
-        plugin = MaisArtPlugin()
+        plugin = PainterMaimaiPlugin()
         plugin._set_context(SimpleNamespace(message=SimpleNamespace(get_by_id=AsyncMock(return_value={
             "raw_message": [{"type": "image", "binary_data_base64": "referenced-image"}],
         }))))
@@ -370,12 +370,12 @@ def test_send_receipt_id_is_used_for_recall_and_unload_cancels_pending_tasks(tmp
                 return {"success": True, "apis": [RECALL_API]}
             return {"success": True, "sent": True, "message_id": "-12345"}
 
-        plugin = MaisArtPlugin()
+        plugin = PainterMaimaiPlugin()
         plugin._set_context(PluginContext(
-            "1021143806.mais_art_journal", rpc_call=rpc,
+            "nguspring.painter_maimai_daily", rpc_call=rpc,
             paths=PluginPaths(data_dir=tmp_path / "data", runtime_dir=tmp_path / "runtime"),
         ))
-        config = MaisArtConfig()
+        config = PainterMaimaiConfig()
         config.basic.auto_recall_enabled = True
         plugin.set_plugin_config(config.model_dump())
         await plugin.on_load()
@@ -403,7 +403,7 @@ def test_send_receipt_id_is_used_for_recall_and_unload_cancels_pending_tasks(tmp
 def test_recall_uses_current_adapter_api_for_the_received_id(
     result: dict, expected_log: str, caplog: pytest.LogCaptureFixture,
 ) -> None:
-    from mais_art_journal.core.utils.recall_utils import schedule_auto_recall
+    from painter_maimai_daily.core.utils.recall_utils import schedule_auto_recall
 
     async def scenario() -> None:
         calls = []
@@ -414,7 +414,7 @@ def test_recall_uses_current_adapter_api_for_the_received_id(
                 return {"success": True, "apis": [RECALL_API]}
             return {"success": True, "result": result}
 
-        ctx = PluginContext("1021143806.mais_art_journal", rpc_call=rpc)
+        ctx = PluginContext("nguspring.painter_maimai_daily", rpc_call=rpc)
         task = await schedule_auto_recall(ctx, SESSION, "12345", 0.001, "[test]")
         assert task is not None
         await task
@@ -426,13 +426,13 @@ def test_recall_uses_current_adapter_api_for_the_received_id(
         }
         assert await schedule_auto_recall(ctx, SESSION, "", 1, "[test]") is None
 
-    with caplog.at_level("INFO", logger="plugin.mais_art_journal.recall"):
+    with caplog.at_level("INFO", logger="plugin.painter_maimai_daily.recall"):
         asyncio.run(scenario())
     assert expected_log in caplog.text
 
 
 def test_recall_api_failure_is_logged(caplog: pytest.LogCaptureFixture) -> None:
-    from mais_art_journal.core.utils.recall_utils import schedule_auto_recall
+    from painter_maimai_daily.core.utils.recall_utils import schedule_auto_recall
 
     async def scenario() -> None:
         async def rpc(method: str, plugin_id: str, payload: dict, **kwargs: object) -> dict:
@@ -440,7 +440,7 @@ def test_recall_api_failure_is_logged(caplog: pytest.LogCaptureFixture) -> None:
                 return {"success": True, "apis": [RECALL_API]}
             raise RuntimeError("对端动作返回失败")
 
-        ctx = PluginContext("1021143806.mais_art_journal", rpc_call=rpc)
+        ctx = PluginContext("nguspring.painter_maimai_daily", rpc_call=rpc)
         task = await schedule_auto_recall(ctx, SESSION, "12345", 0.001, "[test]")
         assert task is not None
         await task

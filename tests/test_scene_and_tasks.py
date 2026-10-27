@@ -14,19 +14,20 @@ import pytest
 import re
 import time
 
-from mais_art_journal.core.pipeline import Pipeline
-from mais_art_journal.core.pipeline.request import GenerationRequest
-from mais_art_journal.core.pipeline.steps.build_selfie_prompt import BuildSelfiePrompt
-from mais_art_journal.core.prompts import selfie_prompt_builder
-from mais_art_journal.core.selfie import auto_selfie_task, group_image_task, proactive_context
-from mais_art_journal.core.selfie.activity_rules import ACTIVITY_OUTFITS, choose_auto_style
-from mais_art_journal.core.selfie.auto_selfie_task import AutoSelfieTask
-from mais_art_journal.core.selfie.group_image_task import GroupImageTask, parse_decision
-from mais_art_journal.core.selfie.proactive_context import recent_context
-from mais_art_journal.core.selfie.reference_image import load_reference_image
-from mais_art_journal.core.selfie.schedule_provider import ActivityInfo, ActivityType, ApiScheduleProvider, classify_activity
-from mais_art_journal.core.state.proactive_state import ProactiveStateStore
-from mais_art_journal.plugin import MaisArtPlugin
+from painter_maimai_daily.core.pipeline import Pipeline
+from painter_maimai_daily.core.pipeline.request import GenerationRequest
+from painter_maimai_daily.core.pipeline.steps.build_selfie_prompt import BuildSelfiePrompt
+from painter_maimai_daily.core.prompts import selfie_prompt_builder
+from painter_maimai_daily.core.selfie import auto_selfie_task, group_image_task, proactive_context
+from painter_maimai_daily.core.selfie.activity_rules import ACTIVITY_OUTFITS, choose_auto_style
+from painter_maimai_daily.core.selfie.auto_selfie_task import AutoSelfieTask
+from painter_maimai_daily.core.selfie.group_image_task import GroupImageTask, parse_decision
+from painter_maimai_daily.core.selfie.proactive_context import recent_context
+from painter_maimai_daily.core.selfie.reference_image import load_reference_image
+from painter_maimai_daily.core.selfie.schedule_provider import ActivityInfo, ActivityType, ApiScheduleProvider, classify_activity
+from painter_maimai_daily.core.qzone.client import PublishResult
+from painter_maimai_daily.core.state.proactive_state import ProactiveStateStore
+from painter_maimai_daily.plugin import PainterMaimaiPlugin
 
 
 IMAGE = base64.b64encode(b"offline-image-result").decode("ascii")
@@ -35,10 +36,10 @@ GROUP_ID = "1001"
 API_FIELDS = {"success", "image_base64", "model_id", "size", "is_img2img", "error", "selfie_style", "outfit"}
 
 
-def make_plugin(tmp_path: Path, **overrides: Any) -> MaisArtPlugin:
+def make_plugin(tmp_path: Path, **overrides: Any) -> PainterMaimaiPlugin:
     """从内存注入 SDK 配置与能力替身，不读取任何实际账号或密钥。"""
     data = {
-        "plugin": {"enabled": True, "config_version": "4.3.0"},
+        "plugin": {"enabled": True, "config_version": "3.3.0"},
         "basic": {"prompt_optimizer_enabled": False},
         "selfie": {
             "auto_enabled": True, "caption_enabled": False, "caption_text": "记录一下此刻。",
@@ -51,21 +52,31 @@ def make_plugin(tmp_path: Path, **overrides: Any) -> MaisArtPlugin:
     }
     for section, fields in overrides.items():
         data[section].update(fields)
-    plugin = MaisArtPlugin()
+    plugin = PainterMaimaiPlugin()
     plugin.set_plugin_config(data)
     plugin._plugin_dir = str(tmp_path)
     plugin._set_context(SimpleNamespace(
         call_capability=AsyncMock(return_value={"result": True}),
         llm=SimpleNamespace(generate=AsyncMock(return_value={"success": True, "response": json.dumps({
-            "destination": "qzone", "reason": "休息时记录今天", "prompt": "在当前日程地点休息时的照片",
+            "destinations": ["qzone"], "reason": "休息时记录今天", "prompt": "在当前日程地点休息时的照片",
         })})),
         config=SimpleNamespace(get=AsyncMock(side_effect=lambda key, default="": default)),
         paths=PluginPaths(data_dir=tmp_path / "sdk-data", runtime_dir=tmp_path / "sdk-runtime"),
-        chat=SimpleNamespace(get_stream_by_group_id=AsyncMock(return_value={
-            "session_id": SESSION_ID, "platform": "qq", "group_id": GROUP_ID, "group_name": "测试群",
-        })),
+        chat=SimpleNamespace(
+            get_stream_by_group_id=AsyncMock(return_value={
+                "session_id": SESSION_ID, "platform": "qq", "group_id": GROUP_ID, "group_name": "测试群",
+            }),
+            get_stream_by_user_id=AsyncMock(return_value={
+                "session_id": "private-session", "platform": "qq", "user_id": "u1",
+                "user_nickname": "小明", "chat_type": "private",
+            }),
+        ),
         send=SimpleNamespace(image=AsyncMock(return_value=True), text=AsyncMock(return_value=True), hybrid=AsyncMock(return_value=True)),
     ))
+    plugin.qzone_publisher = SimpleNamespace(
+        available=True,
+        publish=AsyncMock(return_value=PublishResult("sent", tid="test-tid")),
+    )
     async def load_states() -> None:
         await plugin.runtime_state.load(plugin.ctx.paths.data_dir / "session_settings.json")
         await plugin.proactive_state.load(plugin.ctx.paths.data_dir / "proactive_images.json")
@@ -96,7 +107,7 @@ def messages() -> List[Dict[str, Any]]:
     ]
 
 
-def prepare_group(monkeypatch: pytest.MonkeyPatch, plugin: MaisArtPlugin) -> GroupImageTask:
+def prepare_group(monkeypatch: pytest.MonkeyPatch, plugin: PainterMaimaiPlugin) -> GroupImageTask:
     mock_schedule(monkeypatch, group_image_task, resting_activity())
     plugin.ctx.call_capability.return_value = messages()
     monkeypatch.setattr(plugin, "api_generate_image", AsyncMock(return_value={"success": True, "image_base64": IMAGE}))
@@ -357,42 +368,57 @@ def test_auto_selfie_uses_fixed_caption_and_publishes_existing_image_once(monkey
     asyncio.run(AutoSelfieTask(plugin)._execute_selfie())
     plugin.api_generate_image.assert_awaited_once()
     plugin.ctx.llm.generate.assert_awaited_once()
-    plugin.ctx.call_capability.assert_awaited_once_with(
-        "api.call", timeout_ms=185000, api_name="Rabbit-Jia-Er.MaiTrace.send_feed_api", version="1",
-        args={"message": "记录一下此刻。", "images": [IMAGE]},
-    )
+    plugin.qzone_publisher.publish.assert_awaited_once_with(plugin, IMAGE, "记录一下此刻。")
+    assert plugin.proactive_state.recent()[-1]["status"] == "sent"
 
 
-def test_auto_publish_timeout_is_not_retried(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_auto_selfie_publishes_one_image_to_all_selected_channels(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    plugin = make_plugin(tmp_path, selfie={
+        "group_enabled": True, "qzone_enabled": True,
+        "private_enabled": True, "private_user_ids": ["u1"],
+    })
+    plugin.ctx.call_capability.return_value = messages()
+    plugin.ctx.llm.generate.return_value = {"success": True, "response": json.dumps({
+        "destinations": ["qzone", "group_1", "private_1"],
+        "reason": "吃完饭想记录一下", "prompt": "饭后在客厅休息的照片",
+    })}
+    mock_schedule(monkeypatch, auto_selfie_task, resting_activity())
+    monkeypatch.setattr(plugin, "api_generate_image", AsyncMock(
+        return_value={"success": True, "image_base64": IMAGE},
+    ))
+
+    asyncio.run(AutoSelfieTask(plugin)._execute_selfie())
+
+    plugin.api_generate_image.assert_awaited_once()
+    plugin.qzone_publisher.publish.assert_awaited_once_with(plugin, IMAGE, "记录一下此刻。")
+    assert plugin.ctx.send.hybrid.await_count == 2
+    sent_sessions = {call.args[1] for call in plugin.ctx.send.hybrid.await_args_list}
+    assert sent_sessions == {SESSION_ID, "private-session"}
+    assert [record["status"] for record in plugin.proactive_state.recent()] == ["sent", "sent", "sent"]
+
+
+def test_auto_uncertain_space_result_is_recorded_without_retry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     plugin = make_plugin(tmp_path)
     mock_schedule(monkeypatch, auto_selfie_task, resting_activity())
     monkeypatch.setattr(plugin, "api_generate_image", AsyncMock(return_value={"success": True, "image_base64": IMAGE}))
-    plugin.ctx.call_capability.side_effect = TimeoutError("发布状态未知")
+    plugin.qzone_publisher.publish.return_value = PublishResult("uncertain", error="发布结果待核对")
     task = AutoSelfieTask(plugin)
-    with pytest.raises(TimeoutError, match="待核对"):
-        asyncio.run(task._execute_selfie())
+    asyncio.run(task._execute_selfie())
     assert task._last_attempt_at is not None
-    plugin.ctx.call_capability.assert_awaited_once()
+    plugin.qzone_publisher.publish.assert_awaited_once()
+    assert plugin.proactive_state.recent()[-1]["status"] == "unknown"
 
 
-def test_auto_uncertain_publication_is_reported_for_review_without_retry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_auto_rejected_space_result_is_recorded_as_failed(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     plugin = make_plugin(tmp_path)
     mock_schedule(monkeypatch, auto_selfie_task, resting_activity())
     monkeypatch.setattr(plugin, "api_generate_image", AsyncMock(return_value={"success": True, "image_base64": IMAGE}))
-    plugin.ctx.call_capability.return_value = {"result": False, "uncertain": True, "message": "需要在空间核对结果"}
-    task = AutoSelfieTask(plugin)
-    with pytest.raises(RuntimeError, match="发布结果待核对"):
-        asyncio.run(task._execute_selfie())
-    assert task._last_attempt_at is not None
-    plugin.ctx.call_capability.assert_awaited_once()
-
-
-def test_rpc_runtime_error_keeps_publication_pending_for_review(tmp_path: Path) -> None:
-    plugin = make_plugin(tmp_path)
-    plugin.ctx.call_capability.side_effect = RuntimeError("E_TIMEOUT: Host 连接关闭")
-    with pytest.raises(RuntimeError, match="待核对.*E_TIMEOUT"):
-        asyncio.run(AutoSelfieTask(plugin)._publish_to_qzone(IMAGE, "配文"))
-    plugin.ctx.call_capability.assert_awaited_once()
+    plugin.qzone_publisher.publish.return_value = PublishResult("rejected", error="空间发布被拒绝")
+    asyncio.run(AutoSelfieTask(plugin)._execute_selfie())
+    assert plugin.proactive_state.recent()[-1]["status"] == "failed"
+    plugin.qzone_publisher.publish.assert_awaited_once()
 
 
 def test_auto_cancel_during_generation_never_publishes_late_result(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -566,7 +592,7 @@ def test_config_reload_cancels_old_tasks_and_preserves_cooldown(tmp_path: Path) 
         await group.start()
         old_auto, old_group = auto.task, group.task
         try:
-            await plugin.on_config_update("self", {}, "4.3.0")
+            await plugin.on_config_update("self", {}, "3.3.0")
             assert old_auto.cancelled() and old_group.cancelled()
             assert plugin._auto_selfie_task is auto and plugin._group_image_task is group
             assert auto.task is not old_auto and group.task is not old_group
@@ -695,7 +721,7 @@ def test_group_skip_consumes_context_without_blocking_an_appropriate_selfie(
         assert plugin.proactive_state.available(f"group:{SESSION_ID}", 3600)
         assert plugin.proactive_state.recent() == []
         plugin.ctx.llm.generate.return_value = {"success": True, "response": json.dumps({
-            "destination": "group_1", "reason": "群里问起饭后近况", "prompt": "在当前地点饭后休息的照片",
+            "destinations": ["group_1"], "reason": "群里问起饭后近况", "prompt": "在当前地点饭后休息的照片",
         })}
         await AutoSelfieTask(plugin)._execute_selfie()
 
@@ -733,7 +759,7 @@ def test_inflight_group_decision_does_not_reserve_target_and_loses_to_a_publishe
     group = prepare_group(monkeypatch, plugin)
     mock_schedule(monkeypatch, auto_selfie_task, resting_activity())
     plugin.ctx.llm.generate.return_value = {"success": True, "response": json.dumps({
-        "destination": "group_1", "reason": "回应近况问题", "prompt": "饭后休息的照片",
+        "destinations": ["group_1"], "reason": "回应近况问题", "prompt": "饭后休息的照片",
     })}
 
     async def scenario() -> None:

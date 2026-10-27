@@ -1,7 +1,7 @@
 [project]
-name = "mais-art-journal"
-version = "4.6.3"
-description = "麦麦绘卷：多模型生图、原生 NovelAI、日程自拍与聊天额度"
+name = "painter-maimai-daily"
+version = "4.0.0"
+description = "画家麦麦的日常：多模型生图、原生 NovelAI、内置日程、日程注入与多渠道自拍"
 license = "AGPL-3.0-or-later"
 requires-python = ">=3.12"
 dependencies = [
@@ -11,6 +11,7 @@ dependencies = [
     "pydantic>=2,<3",
     "tomlkit>=0.12",
     "tzdata>=2024.1",
+    "httpx>=0.24,<1",
 ]
 
 [project.optional-dependencies]

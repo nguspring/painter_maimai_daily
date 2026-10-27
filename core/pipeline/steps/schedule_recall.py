@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from ..request import GenerationRequest
     from ..step import PipelineContext
 
-logger = logging.getLogger("plugin.mais_art_journal.step.recall")
+logger = logging.getLogger("plugin.painter_maimai_daily.step.recall")
 
 
 class ScheduleRecall(BaseStep):

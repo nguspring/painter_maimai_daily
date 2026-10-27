@@ -10,7 +10,7 @@ import urllib.request
 if TYPE_CHECKING:
     from .request_context import RequestContext
 
-logger = logging.getLogger("plugin.mais_art_journal.image")
+logger = logging.getLogger("plugin.painter_maimai_daily.image")
 
 
 class ImageProcessor:

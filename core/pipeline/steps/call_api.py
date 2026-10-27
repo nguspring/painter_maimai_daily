@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from ..request import GenerationRequest
     from ..step import PipelineContext
 
-logger = logging.getLogger("plugin.mais_art_journal.step.call_api")
+logger = logging.getLogger("plugin.painter_maimai_daily.step.call_api")
 
 
 class CallApi(BaseStep):

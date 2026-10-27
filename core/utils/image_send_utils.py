@@ -9,7 +9,7 @@ from typing import Tuple, Callable
 
 from .shared_constants import BASE64_IMAGE_PREFIXES
 
-logger = logging.getLogger("plugin.mais_art_journal.image_send")
+logger = logging.getLogger("plugin.painter_maimai_daily.image_send")
 
 
 async def resolve_image_data(

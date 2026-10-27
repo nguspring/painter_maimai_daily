@@ -22,16 +22,16 @@ from ..state import StatePersistenceError
 from .registry import CommandResult, SubCommandRegistry
 
 if TYPE_CHECKING:
-    from ...plugin import MaisArtPlugin
+    from ...plugin import PainterMaimaiPlugin
 
-logger = logging.getLogger("plugin.mais_art_journal.dispatcher")
+logger = logging.getLogger("plugin.painter_maimai_daily.dispatcher")
 
 
 @dataclass
 class DispatcherContext:
     """一次 /dr 调用的上下文"""
 
-    plugin: "MaisArtPlugin"
+    plugin: "PainterMaimaiPlugin"
     stream_id: str
     chat_id: str
     message: Any
@@ -48,7 +48,7 @@ class DispatcherContext:
 class CommandDispatcher:
     """单一入口：分发 /dr <head> <tail>"""
 
-    def __init__(self, plugin: "MaisArtPlugin"):
+    def __init__(self, plugin: "PainterMaimaiPlugin"):
         self.plugin = plugin
         # 强制 import handlers 包以触发 @subcommand 装饰器注册
         from . import handlers  # noqa: F401
@@ -146,4 +146,4 @@ class CommandDispatcher:
             return f"[{group_name}]"
         if user_nickname:
             return f"[{user_nickname} 的 私聊]"
-        return f"[MaisArt {self._resolved_prefix()}]"
+        return f"[PainterMaimai {self._resolved_prefix()}]"

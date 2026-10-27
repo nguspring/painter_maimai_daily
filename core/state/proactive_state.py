@@ -224,7 +224,13 @@ class ProactiveStateStore:
             for record in data["history"]
         )
 
-    async def reserve(self, *, source: str, target: str, cooldown_seconds: float, activity_key: str = "", activity: str = "", location: str = "", prompt: str = "", reason: str = "", is_selfie: bool = False, messages: Optional[List[Dict[str, str]]] = None, min_messages: int = 0, source_cooldown: float = 0) -> Optional[str]:
+    def batch_duplicate(self, prompt: str = "", *, is_selfie: bool = False, activity_key: str = "") -> bool:
+        """只读判重：多目标同批发布前检查一次，避免第一条预占后误伤后续目标。"""
+        self._require_loaded()
+        return self._duplicate(self._data, "", prompt, is_selfie, activity_key)
+
+    async def reserve(self, *, source: str, target: str, cooldown_seconds: float, activity_key: str = "", activity: str = "", location: str = "", prompt: str = "", reason: str = "", is_selfie: bool = False, messages: Optional[List[Dict[str, str]]] = None, min_messages: int = 0, source_cooldown: float = 0, dedupe: bool = True) -> Optional[str]:
+        """预占单个目标；同一批的后续目标可传 ``dedupe=False``（D13）。"""
         token = uuid.uuid4().hex
 
         def change(data: Dict[str, Any]) -> Optional[str]:
@@ -232,7 +238,9 @@ class ProactiveStateStore:
                 return None
             consumed = data["targets"].get(target, {}).get("consumed", [])
             fresh = [item["message_id"] for item in (messages or []) if item["message_id"] not in consumed]
-            if len(fresh) < min_messages or self._duplicate(data, token, prompt, is_selfie, activity_key):
+            if len(fresh) < min_messages:
+                return None
+            if dedupe and self._duplicate(data, token, prompt, is_selfie, activity_key):
                 return None
             now = time.time()
             data["targets"][target] = {"last_attempt": now, "consumed": list(dict.fromkeys(consumed + fresh))[-400:]}

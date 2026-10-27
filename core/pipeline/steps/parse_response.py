@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from ..request import GenerationRequest
     from ..step import PipelineContext
 
-logger = logging.getLogger("plugin.mais_art_journal.step.parse_response")
+logger = logging.getLogger("plugin.painter_maimai_daily.step.parse_response")
 
 
 class ParseResponse(BaseStep):

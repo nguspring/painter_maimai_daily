@@ -105,7 +105,7 @@ async def generate_image_standalone(
     """
     import logging
     from ..utils import merge_negative_prompt
-    _logger = logging.getLogger("plugin.mais_art_journal.standalone")
+    _logger = logging.getLogger("plugin.painter_maimai_daily.standalone")
 
     merged_config = merge_negative_prompt(model_config, negative_prompt) if negative_prompt else model_config
 

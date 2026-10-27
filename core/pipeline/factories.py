@@ -42,9 +42,9 @@ from .steps import (
 )
 
 if TYPE_CHECKING:
-    from ...plugin import MaisArtPlugin
+    from ...plugin import PainterMaimaiPlugin
 
-logger = logging.getLogger("plugin.mais_art_journal.factories")
+logger = logging.getLogger("plugin.painter_maimai_daily.factories")
 
 
 # ==================== 5 个 Pipeline 工厂 ====================
@@ -149,7 +149,7 @@ def build_standalone_pipeline() -> Pipeline:
 
 # ==================== PipelineContext 构造 ====================
 
-def make_pipeline_context(plugin: "MaisArtPlugin", req: GenerationRequest) -> PipelineContext:
+def make_pipeline_context(plugin: "PainterMaimaiPlugin", req: GenerationRequest) -> PipelineContext:
     """构造一次请求的 PipelineContext"""
     request_ctx = RequestContext(
         plugin,
@@ -206,17 +206,17 @@ def _build_log_prefix(kwargs: Dict[str, Any]) -> str:
         return f"[{group_name or '群' + group_id}]"
     if user_nickname or user_id:
         return f"[{user_nickname or 'QQ' + user_id} 的 私聊]"
-    return "[MaisArt]"
+    return "[PainterMaimai]"
 
 
-def _load_selfie_reference_image(plugin: "MaisArtPlugin", log_prefix: str) -> Optional[str]:
+def _load_selfie_reference_image(plugin: "PainterMaimaiPlugin", log_prefix: str) -> Optional[str]:
     """加载 selfie.reference_image_path 指定的参考图，返回 base64 或 None"""
     del log_prefix
     return load_reference_image(plugin.plugin_dir, plugin.config.selfie.reference_image_path)
 
 
 async def build_request_from_tool_kwargs(
-    plugin: "MaisArtPlugin",
+    plugin: "PainterMaimaiPlugin",
     kwargs: Dict[str, Any],
 ) -> Optional[GenerationRequest]:
     """从 @Tool 注入的 kwargs 构造 GenerationRequest
@@ -306,7 +306,7 @@ async def build_request_from_tool_kwargs(
         if plugin.runtime_state.is_selfie_schedule_enabled(chat_id, global_schedule):
             try:
                 from ..selfie.schedule_provider import get_schedule_provider
-                provider = get_schedule_provider(ctx=plugin.ctx, chat_id="global", include_life=True)
+                provider = get_schedule_provider(plugin, chat_id="global", include_life=True)
                 activity = await provider.get_current_activity()
                 if activity:
                     activity_type = activity.activity_type.value

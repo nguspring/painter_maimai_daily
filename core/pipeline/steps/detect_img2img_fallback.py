@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from ..request import GenerationRequest
     from ..step import PipelineContext
 
-logger = logging.getLogger("plugin.mais_art_journal.step.img2img_fallback")
+logger = logging.getLogger("plugin.painter_maimai_daily.step.img2img_fallback")
 
 
 class DetectImg2ImgFallback(BaseStep):

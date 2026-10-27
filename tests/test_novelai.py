@@ -17,19 +17,19 @@ import requests
 import tomllib
 import zipfile
 
-from mais_art_journal.core.api_clients import get_client_class
-from mais_art_journal.core.api_clients import novelai_client as nai
-from mais_art_journal.core.api_clients.base_client import NonRetryableError
-from mais_art_journal.core.api_clients.client_context import ClientContext, ProxyConfig
-from mais_art_journal.core.config.migration import normalize_config_for_upgrade, upgrade_config_file
-from mais_art_journal.core.config.models import MaisArtConfig, ModelConfig
-from mais_art_journal.core.config.novelai import NOVELAI_FIELD_NAMES, NovelAIConfig
-from mais_art_journal.core.pipeline.request import GenerationRequest
-from mais_art_journal.core.pipeline.steps.build_selfie_prompt import BuildSelfiePrompt
-from mais_art_journal.core.pipeline.steps.merge_negative_prompt import MergeNegativePrompt
-from mais_art_journal.core.prompts import selfie_prompt_builder
-from mais_art_journal.core.prompts.novelai_prompt import convert_novelai_weights
-from mais_art_journal.plugin import MaisArtPlugin
+from painter_maimai_daily.core.api_clients import get_client_class
+from painter_maimai_daily.core.api_clients import novelai_client as nai
+from painter_maimai_daily.core.api_clients.base_client import NonRetryableError
+from painter_maimai_daily.core.api_clients.client_context import ClientContext, ProxyConfig
+from painter_maimai_daily.core.config.migration import normalize_config_for_upgrade, upgrade_config_file
+from painter_maimai_daily.core.config.models import PainterMaimaiConfig, ModelConfig
+from painter_maimai_daily.core.config.novelai import NOVELAI_FIELD_NAMES, NovelAIConfig
+from painter_maimai_daily.core.pipeline.request import GenerationRequest
+from painter_maimai_daily.core.pipeline.steps.build_selfie_prompt import BuildSelfiePrompt
+from painter_maimai_daily.core.pipeline.steps.merge_negative_prompt import MergeNegativePrompt
+from painter_maimai_daily.core.prompts import selfie_prompt_builder
+from painter_maimai_daily.core.prompts.novelai_prompt import convert_novelai_weights
+from painter_maimai_daily.plugin import PainterMaimaiPlugin
 
 
 def image_bytes(size: Tuple[int, int] = (64, 64), image_format: str = "PNG") -> bytes:
@@ -173,7 +173,7 @@ def test_bearer_prefix_is_applied_once(client: nai.NovelAIClient, transport: Tra
 
 
 def test_nai_options_are_editable_primitive_fields_in_actual_webui_schema() -> None:
-    plugin = MaisArtPlugin()
+    plugin = PainterMaimaiPlugin()
     schema = plugin.get_webui_config_schema()
     fields = schema["sections"]["models"]["fields"]["items"]["item_fields"]
     assert "novelai" not in fields
@@ -186,7 +186,7 @@ def test_nai_options_are_editable_primitive_fields_in_actual_webui_schema() -> N
 
 
 def test_flat_nai_options_survive_plugin_save_and_reach_transport(transport: Transport) -> None:
-    plugin = MaisArtPlugin()
+    plugin = PainterMaimaiPlugin()
     data = plugin.get_default_config()
     data["basic"]["generation_timeout_seconds"] = 420
     data["models"]["items"] = [{
@@ -214,7 +214,7 @@ def test_flat_nai_options_survive_plugin_save_and_reach_transport(transport: Tra
 def test_nested_nai_config_upgrades_on_disk_without_losing_values(tmp_path: Path) -> None:
     path = tmp_path / "config.toml"
     original = b'''[plugin]
-config_version = "4.6.2"
+config_version = "3.6.2"
 [[models.items]]
 id = "nai-old"
 format = "novelai"
@@ -232,7 +232,7 @@ request_timeout_seconds = 45
     path.write_bytes(original)
     assert upgrade_config_file(path)
     migrated = tomllib.loads(path.read_text(encoding="utf-8"))
-    item = MaisArtConfig.model_validate(migrated).models.items[0]
+    item = PainterMaimaiConfig.model_validate(migrated).models.items[0]
     assert "novelai" not in migrated["models"]["items"][0]
     assert item.api_key == "offline-secret" and item.novelai_mode == "anime"
     assert not item.novelai_quality_tags and item.novelai_smea and item.novelai_smea_dynamic
@@ -244,7 +244,7 @@ request_timeout_seconds = 45
 
 
 def test_explicit_flat_nai_settings_override_old_nested_values() -> None:
-    data = MaisArtConfig().model_dump()
+    data = PainterMaimaiConfig().model_dump()
     data["models"]["items"] = [{
         "id": "nai", "novelai_quality_tags": False,
         "novelai": {"quality_tags": True, "img2img_noise": 0.4},
@@ -331,7 +331,7 @@ def test_job_status_diagnostic_does_not_log_token_or_image(
     body = json.loads(json_response(transport.output_image).body)
     body["job"]["status"] = "offline-secret\ncompleted"
     transport.results.append(Response(json.dumps(body).encode(), content_type="application/json"))
-    with caplog.at_level("INFO", logger="plugin.mais_art_journal.api"):
+    with caplog.at_level("INFO", logger="plugin.painter_maimai_daily.api"):
         assert generate(client, config(novelai_api_mode="json"))[0]
     assert "job.status=[已隐藏密钥] completed" in caplog.text
     assert "offline-secret" not in caplog.text and body["images"][0] not in caplog.text

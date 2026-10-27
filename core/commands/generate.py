@@ -21,10 +21,10 @@ from ..utils.request_context import RequestContext
 from .registry import CommandResult
 
 if TYPE_CHECKING:
-    from ...plugin import MaisArtPlugin
+    from ...plugin import PainterMaimaiPlugin
     from .dispatcher import DispatcherContext
 
-logger = logging.getLogger("plugin.mais_art_journal.cmd.generate")
+logger = logging.getLogger("plugin.painter_maimai_daily.cmd.generate")
 
 
 _RESERVED = {"list", "models", "config", "set", "reset", "on", "off",
@@ -52,7 +52,7 @@ def _get_natural_pipeline():
     return _NATURAL_PIPELINE
 
 
-async def handle_generate(plugin: "MaisArtPlugin", dctx: "DispatcherContext", content: str) -> CommandResult:
+async def handle_generate(plugin: "PainterMaimaiPlugin", dctx: "DispatcherContext", content: str) -> CommandResult:
     """fallback 入口：先尝试风格，否则按自然语言"""
     if not plugin.config.basic.enable_pic_command:
         await plugin.ctx.send.text("图片生成命令已关闭，仍可使用管理和额度命令。", dctx.stream_id)
@@ -91,7 +91,7 @@ async def handle_generate(plugin: "MaisArtPlugin", dctx: "DispatcherContext", co
 # ==================== 风格模式 ====================
 
 async def _execute_style_mode(
-    plugin: "MaisArtPlugin",
+    plugin: "PainterMaimaiPlugin",
     dctx: "DispatcherContext",
     style_label: str,
     actual_style: str,
@@ -160,7 +160,7 @@ async def _execute_style_mode(
 # ==================== 自然语言模式 ====================
 
 async def _execute_natural_mode(
-    plugin: "MaisArtPlugin",
+    plugin: "PainterMaimaiPlugin",
     dctx: "DispatcherContext",
     description: str,
 ) -> CommandResult:

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
     from ..selfie.schedule_provider import ActivityInfo
 
-logger = logging.getLogger("plugin.mais_art_journal.scene_llm")
+logger = logging.getLogger("plugin.painter_maimai_daily.scene_llm")
 
 
 # ==================== 确定性映射（关闭 LLM 场景优化时使用） ====================

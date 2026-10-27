@@ -1,16 +1,17 @@
-"""麦麦绘卷 SDK 2.x 插件入口（Pipeline 架构）
+"""画家麦麦的日常 SDK 2.x 插件入口（Pipeline 架构）
 
 组件：
 - @Tool draw_picture: 智能文/图生图，由 LLM/规划器按需调用；委托给 action pipeline
 - @Command dr: 单一入口，通过 CommandDispatcher 分发到 @subcommand 注册的 handlers
 - @API generate_image: 对外暴露的生图接口，供其他插件 ctx.api.call 调用
 - @API list_image_models: 对外暴露的模型清单接口
+- @HookHandler: 规划器与回复器请求前注入当前日程
 
 生命周期：
-- on_load: 初始化 dispatcher + 加载 action pipeline + 启动自动自拍
-- on_unload: 停止自动自拍
+- on_load: 初始化配置/状态/日程库/注入引擎/空间发布器，再启动后台任务
+- on_unload: 先停后台任务，再关闭 SQLite 连接
 - create_plugin: 在宿主重建配置前迁移并备份旧配置
-- on_config_update: 同步自动自拍和群图任务
+- on_config_update: 重建日程库与纯内存服务，并重启全部后台周期
 """
 from __future__ import annotations
 
@@ -19,30 +20,33 @@ from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional, Set, Tuple
 
-from maibot_sdk import API, Command, MaiBotPlugin, Tool
+from maibot_sdk import API, Command, HookHandler, MaiBotPlugin, Tool
+from maibot_sdk.types import HookMode, HookOrder
 
 import asyncio
 import logging
 import os
 import re
 
-from .core.config.models import MaisArtConfig
+from .core.config.models import PainterMaimaiConfig
 from .core.quota import QuotaStore
 from .core.state import ProactiveStateStore, RuntimeStateManager
 
 if TYPE_CHECKING:
     from .core.commands.dispatcher import CommandDispatcher
     from .core.pipeline import Pipeline
+    from .core.schedule.manager import ScheduleManager
+    from .core.schedule.task import ScheduleTask
     from .core.selfie.auto_selfie_task import AutoSelfieTask
     from .core.selfie.group_image_task import GroupImageTask
 
-logger = logging.getLogger("plugin.mais_art_journal")
+logger = logging.getLogger("plugin.painter_maimai_daily")
 
 
 def _tracked_operation(function: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
     """保持 SDK 组件签名及元数据，记录卸载前必须结束的生图和管理调用。"""
     @wraps(function)
-    async def wrapped(plugin: "MaisArtPlugin", *args: Any, **kwargs: Any) -> Any:
+    async def wrapped(plugin: "PainterMaimaiPlugin", *args: Any, **kwargs: Any) -> Any:
         if plugin._closing:
             raise RuntimeError("绘卷正在卸载，已停止接受新的生图和管理请求")
         task = asyncio.current_task()
@@ -68,10 +72,10 @@ def _generation_failure(error: str) -> Dict[str, Any]:
     }
 
 
-class MaisArtPlugin(MaiBotPlugin):
-    """麦麦绘卷（Claude MAInet）智能多模型图片生成插件"""
+class PainterMaimaiPlugin(MaiBotPlugin):
+    """画家麦麦的日常智能多模型图片生成插件"""
 
-    config_model = MaisArtConfig
+    config_model = PainterMaimaiConfig
     config_reload_subscriptions = ()  # 不订阅 bot/model 全局广播
 
     # 智能生图 Tool 描述（2026-08-23 精简：原 1058 字符过长，导致 MaiBot deferred-tools
@@ -134,6 +138,10 @@ class MaisArtPlugin(MaiBotPlugin):
         self._action_pipeline: Optional["Pipeline"] = None
         self._auto_selfie_task: Optional["AutoSelfieTask"] = None
         self._group_image_task: Optional["GroupImageTask"] = None
+        self._schedule_task: Optional["ScheduleTask"] = None
+        self.schedule_manager: Optional["ScheduleManager"] = None
+        self.injection_engine: Optional[Any] = None
+        self.qzone_publisher: Optional[Any] = None
         self.runtime_state = RuntimeStateManager()
         self.proactive_state = ProactiveStateStore()
         self.quota_store = QuotaStore()
@@ -185,6 +193,16 @@ class MaisArtPlugin(MaiBotPlugin):
             await self.proactive_state.load(data_dir / "proactive_images.json")
             self._dispatcher = CommandDispatcher(self)
             self._action_pipeline = build_action_pipeline()
+            from .core.inject.engine import InjectionEngine
+            from .core.qzone.publisher import QzonePublisher
+            self.injection_engine = InjectionEngine(self)
+            self.qzone_publisher = QzonePublisher(self)
+
+            if self.config.schedule.enabled:
+                self.schedule_manager = await self._build_schedule_manager(data_dir)
+                from .core.schedule.task import ScheduleTask
+                self._schedule_task = ScheduleTask(self)
+                await self._schedule_task.start()
 
             if self.config.selfie.auto_enabled:
                 from .core.selfie.auto_selfie_task import AutoSelfieTask
@@ -203,11 +221,29 @@ class MaisArtPlugin(MaiBotPlugin):
                 logger.exception("启动失败后的资源清理也出现异常")
             raise
 
-        logger.info(f"麦麦绘卷已加载 (v{self.config.plugin.config_version}, Pipeline 架构)")
+        logger.info(f"画家麦麦的日常已加载 (v{self.config.plugin.config_version}, Pipeline 架构)")
+
+    async def _build_schedule_manager(self, data_dir: Path) -> "ScheduleManager":
+        """按当前配置创建日程库；数据库固定放在 SDK 数据目录（D7）。"""
+        from .core.schedule.manager import ScheduleManager
+        manager = ScheduleManager(
+            data_dir / "schedule.db",
+            timezone=self.config.schedule.timezone,
+            template_mode=self.config.schedule.template_mode,
+        )
+        await manager.initialize()
+        return manager
+
+    def _rebuild_support_services(self) -> None:
+        """配置热更新后重建只依赖内存的注入引擎与空间发布器。"""
+        from .core.inject.engine import InjectionEngine
+        from .core.qzone.publisher import QzonePublisher
+        self.injection_engine = InjectionEngine(self)
+        self.qzone_publisher = QzonePublisher(self)
 
     async def on_unload(self) -> None:
         await self._close_resources()
-        logger.info("麦麦绘卷已卸载")
+        logger.info("画家麦麦的日常已卸载")
 
     async def _close_resources(self) -> None:
         """宿主先 on_unload 再取消 RPC；插件必须自行排空，取消也不能打断清理。"""
@@ -215,7 +251,7 @@ class MaisArtPlugin(MaiBotPlugin):
         self._dispatcher = None
         self._action_pipeline = None
         if self._cleanup_task is None:
-            self._cleanup_task = asyncio.create_task(self._finish_cleanup(), name="mais-art:cleanup")
+            self._cleanup_task = asyncio.create_task(self._finish_cleanup(), name="painter-maimai:cleanup")
         cancelled = False
         while True:
             try:
@@ -254,12 +290,21 @@ class MaisArtPlugin(MaiBotPlugin):
                         await self._auto_selfie_task.stop()
                 finally:
                     try:
-                        await self.proactive_state.close()
+                        if self._schedule_task is not None:
+                            await self._schedule_task.stop()
                     finally:
                         try:
-                            await self.quota_store.close()
+                            if self.schedule_manager is not None:
+                                await self.schedule_manager.close()
+                                self.schedule_manager = None
                         finally:
-                            await self.runtime_state.close()
+                            try:
+                                await self.proactive_state.close()
+                            finally:
+                                try:
+                                    await self.quota_store.close()
+                                finally:
+                                    await self.runtime_state.close()
 
     @_tracked_operation
     async def on_config_update(self, scope: str, config_data: dict, version: str) -> None:
@@ -267,14 +312,32 @@ class MaisArtPlugin(MaiBotPlugin):
             return
 
         # 先取消旧周期，再读取新配置；保留冷却与消息游标，避免热更新重复发布。
+        from .core.schedule.task import ScheduleTask
         from .core.selfie.auto_selfie_task import AutoSelfieTask
         from .core.selfie.group_image_task import GroupImageTask
         if self._auto_selfie_task is not None:
             await self._auto_selfie_task.stop()
         if self._group_image_task is not None:
             await self._group_image_task.stop()
+        if self._schedule_task is not None:
+            await self._schedule_task.stop()
         if self._closing:
             return
+
+        old_manager = self.schedule_manager
+        if self.config.schedule.enabled:
+            self.schedule_manager = await self._build_schedule_manager(self.ctx.paths.data_dir)
+        else:
+            self.schedule_manager = None
+        if old_manager is not None:
+            await old_manager.close()
+        self._rebuild_support_services()
+
+        if self.config.schedule.enabled:
+            self._schedule_task = ScheduleTask(self)
+            await self._schedule_task.start()
+        else:
+            self._schedule_task = None
         if self.config.selfie.auto_enabled:
             if self._auto_selfie_task is None:
                 self._auto_selfie_task = AutoSelfieTask(self)
@@ -289,6 +352,8 @@ class MaisArtPlugin(MaiBotPlugin):
                 await self._group_image_task.stop()
                 if self._auto_selfie_task is not None:
                     await self._auto_selfie_task.stop()
+                if self._schedule_task is not None:
+                    await self._schedule_task.stop()
                 raise
 
     # ── Tool: 智能生图 ──────────────────────────
@@ -329,7 +394,7 @@ class MaisArtPlugin(MaiBotPlugin):
         "generate_image",
         description=(
             "生成图片（文生图 / 图生图，自动识别）并返回 base64，不发送到聊天流。"
-            "其他插件可通过 ctx.api.call('1021143806.mais_art_journal.generate_image', "
+            "其他插件可通过 ctx.api.call('nguspring.painter_maimai_daily.generate_image', "
             "prompt=..., model_id=..., input_image_base64=..., ...) 复用本插件配置的全部模型。"
         ),
         version="1",
@@ -399,7 +464,7 @@ class MaisArtPlugin(MaiBotPlugin):
             ::
 
                 result = await self.ctx.api.call(
-                    "1021143806.mais_art_journal.generate_image",
+                    "nguspring.painter_maimai_daily.generate_image",
                     prompt="一只在月光下打哈欠的银发狐妖",
                     model_id="model1",
                     size="1024x1024",
@@ -547,7 +612,7 @@ class MaisArtPlugin(MaiBotPlugin):
     @Command(
         "dr",
         timeout_ms=240000,
-        description="麦麦绘卷命令套件（生图 / 模型管理 / 风格管理 / 自拍开关 / 额度）。命令前缀可在「基础配置.命令前缀」修改后重启 MaiBot 生效",
+        description="画家麦麦的日常命令套件（生图 / 模型管理 / 风格管理 / 自拍开关 / 额度）。命令前缀可在「基础配置.命令前缀」修改后重启 MaiBot 生效",
         pattern=r"^\s*(?:\[(?=[^\]]*(?:图片|image|表情|emoji))(?:[^\[\]]|\[[^\]]*\])*\]\s*)*(?:.*，说：\s*)?/dr(?:\s+(?P<rest>.+))?$",
     )
     @_tracked_operation
@@ -592,6 +657,36 @@ class MaisArtPlugin(MaiBotPlugin):
             group_name=group_name,
         )
 
+    # ── Hook：日程注入 ─────────────────────────────
+
+    @HookHandler(
+        "maisaka.planner.before_request",
+        name="painter_maimai_schedule_planner",
+        description="在规划器请求前把当前日程作为背景追加到 Context Items",
+        mode=HookMode.BLOCKING,
+        order=HookOrder.NORMAL,
+        timeout_ms=5000,
+    )
+    async def handle_planner_before_request(self, **kwargs: Any) -> Dict[str, Any]:
+        """只调用内存注入引擎；异常由宿主按 SKIP 策略记录。"""
+        if self._closing or self.injection_engine is None:
+            return {"action": "continue"}
+        return self.injection_engine.planner(kwargs)
+
+    @HookHandler(
+        "maisaka.replyer.before_request",
+        name="painter_maimai_schedule_replyer",
+        description="在回复器请求前把当前日程追加到 extra_prompt",
+        mode=HookMode.BLOCKING,
+        order=HookOrder.NORMAL,
+        timeout_ms=5000,
+    )
+    async def handle_replyer_before_request(self, **kwargs: Any) -> Dict[str, Any]:
+        """重试轮复用同一段背景，避免 extra_prompt 反复变化。"""
+        if self._closing or self.injection_engine is None:
+            return {"action": "continue"}
+        return self.injection_engine.replyer(kwargs)
+
     # ── get_components 覆写：动态注入用户配置的精确命令前缀 ──
 
     def get_components(self) -> List[Dict[str, Any]]:
@@ -626,16 +721,16 @@ class MaisArtPlugin(MaiBotPlugin):
                     metadata = {}
                     comp["metadata"] = metadata
                 metadata["command_pattern"] = new_pattern
-                logger.info(f"麦麦绘卷命令前缀生效: {prefix!r} (pattern={new_pattern!r})")
+                logger.info(f"画家麦麦的日常命令前缀生效: {prefix!r} (pattern={new_pattern!r})")
                 break
 
         return components
 
 
-def create_plugin() -> MaisArtPlugin:
+def create_plugin() -> PainterMaimaiPlugin:
     """SDK Runner 工厂入口：先迁移磁盘配置，避免宿主重建时丢弃旧字段。"""
     from .core.config.migration import upgrade_config_file
-    plugin = MaisArtPlugin()
+    plugin = PainterMaimaiPlugin()
     upgrade_config_file(Path(plugin.plugin_dir) / "config.toml")
     return plugin
 

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from .store import QuotaPolicy, QuotaSubject
 
 if TYPE_CHECKING:
-    from ...plugin import MaisArtPlugin
+    from ...plugin import PainterMaimaiPlugin
     from ..config.quota import QuotaSection
 
 
@@ -34,7 +34,7 @@ def select_policy(config: "QuotaSection", subject: QuotaSubject) -> QuotaPolicy:
 
 
 async def resolve_quota_context(
-    plugin: "MaisArtPlugin",
+    plugin: "PainterMaimaiPlugin",
     *,
     stream_id: str,
     platform: str,

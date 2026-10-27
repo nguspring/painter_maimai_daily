@@ -11,7 +11,7 @@ import asyncio
 import pytest
 import sqlite3
 
-from mais_art_journal.core.quota import (
+from painter_maimai_daily.core.quota import (
     QuotaExceeded,
     QuotaPeriod,
     QuotaPolicy,
@@ -22,7 +22,7 @@ from mais_art_journal.core.quota import (
     QuotaSubjectMismatch,
     SettlementOutcome,
 )
-from mais_art_journal.core.quota import store as quota_module
+from painter_maimai_daily.core.quota import store as quota_module
 
 
 GROUP = QuotaSubject("qq", "group", "10001")

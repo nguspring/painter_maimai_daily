@@ -8,11 +8,11 @@ from unittest.mock import AsyncMock
 import asyncio
 import pytest
 
-from mais_art_journal.core.commands import generate
-from mais_art_journal.core.commands.dispatcher import CommandDispatcher
-from mais_art_journal.core.config.models import ModelConfig
-from mais_art_journal.core.pipeline.steps.resolve_model import ResolveModel
-from mais_art_journal.plugin import MaisArtPlugin
+from painter_maimai_daily.core.commands import generate
+from painter_maimai_daily.core.commands.dispatcher import CommandDispatcher
+from painter_maimai_daily.core.config.models import ModelConfig
+from painter_maimai_daily.core.pipeline.steps.resolve_model import ResolveModel
+from painter_maimai_daily.plugin import PainterMaimaiPlugin
 
 
 @pytest.mark.parametrize("description,model_id,prompt", [
@@ -52,7 +52,7 @@ def test_dispatch_selects_model4_over_doubao_defaults(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, command: str, enabled: bool,
 ) -> None:
     async def scenario() -> None:
-        plugin = MaisArtPlugin()
+        plugin = PainterMaimaiPlugin()
         config = plugin.get_default_config()
         config["plugin"]["enabled"] = True
         config["basic"].update(command_prefix="/dv", pic_command_model="model3")

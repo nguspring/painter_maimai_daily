@@ -18,9 +18,9 @@ from .proactive_context import activity_arguments, activity_block_reason, group_
 from .schedule_provider import ActivityInfo, get_schedule_provider
 
 if TYPE_CHECKING:
-    from ...plugin import MaisArtPlugin
+    from ...plugin import PainterMaimaiPlugin
 
-logger = logging.getLogger("plugin.mais_art_journal.group_image")
+logger = logging.getLogger("plugin.painter_maimai_daily.group_image")
 
 def parse_decision(response: str) -> Dict[str, Any]:
     """严格验证模型决定；字符串 false 不能被 bool() 误判为真。"""
@@ -53,7 +53,7 @@ def parse_decision(response: str) -> Dict[str, Any]:
 class GroupImageTask:
     """可取消的轮询；判断游标独立，实际生图与日程自拍共享群冷却。"""
 
-    def __init__(self, plugin: "MaisArtPlugin") -> None:
+    def __init__(self, plugin: "PainterMaimaiPlugin") -> None:
         self.plugin = plugin
         self.task: Optional[asyncio.Task] = None
         self.is_running = False
@@ -67,7 +67,7 @@ class GroupImageTask:
         if any(not group_id or group_id != group_id.strip() for group_id in cfg.group_ids):
             raise ValueError("主动图片名单不能包含空群号或首尾空白")
         self.is_running = True
-        self.task = asyncio.create_task(self._loop(), name="mais-art:group-image")
+        self.task = asyncio.create_task(self._loop(), name="painter-maimai:group-image")
         logger.info("群聊主动图片任务已启动")
 
     async def stop(self) -> None:
@@ -110,7 +110,7 @@ class GroupImageTask:
         target = f"group:{context.session_id}"
         if len(store.unconsumed(target, context.messages)) < cfg.min_messages:
             return
-        provider = get_schedule_provider(self.plugin.ctx, include_life=True)
+        provider = get_schedule_provider(self.plugin, include_life=True)
         activity = await provider.get_current_activity()
         block = activity_block_reason(self.plugin, activity, group=True, before_generation=True)
         if block:

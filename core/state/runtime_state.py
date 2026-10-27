@@ -15,7 +15,7 @@ import os
 import tempfile
 
 
-logger = logging.getLogger("plugin.mais_art_journal.state")
+logger = logging.getLogger("plugin.painter_maimai_daily.state")
 
 _SCHEMA_VERSION = 1
 _VALID_SELFIE_STYLES = frozenset({"auto", "standard", "mirror", "photo"})

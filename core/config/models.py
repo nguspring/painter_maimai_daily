@@ -1,4 +1,4 @@
-"""mais_art_journal 配置模型（SDK 2.x 强类型）
+"""painter_maimai_daily 配置模型（SDK 2.x 强类型）
 
 v4.2.0 起 section 重新组织：
 - BasicSection：合并 generation + components + cache + auto_recall + prompt_optimizer + 命令前缀
@@ -10,6 +10,7 @@ v4.2.0 起 section 重新组织：
 from maibot_sdk import Field, PluginConfigBase
 from pydantic import field_validator, model_validator
 from typing import List, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .quota import QuotaSection
 from ..selfie.activity_rules import default_activity_rules
@@ -25,12 +26,12 @@ class PluginSection(PluginConfigBase):
     __ui_order__ = 1
 
     name: str = Field(
-        default="麦麦绘卷",
-        description="麦麦绘卷（Claude MAInet）— 智能多模型图片生成插件，支持文生图/图生图自动识别",
+        default="画家麦麦的日常",
+        description="画家麦麦的日常— 智能多模型图片生成插件，支持文生图/图生图自动识别",
         json_schema_extra={"label": "插件名称", "disabled": True, "order": 1},
     )
     config_version: str = Field(
-        default="4.6.3",
+        default="4.0.0",
         description="插件配置版本，由插件自动维护，升级时用于备份和迁移已有配置",
         json_schema_extra={"label": "配置版本", "disabled": True, "order": 2},
     )
@@ -340,6 +341,23 @@ class SelfieSection(PluginConfigBase):
         description="允许自动自拍选择群聊。候选沿用 group_image.platform/group_ids、群静默和群冷却；无需开启群话题随机图",
         json_schema_extra={"label": "允许发群", "order": 21.3},
     )
+    private_enabled: bool = Field(
+        default=False,
+        description="允许自动自拍给名单内的私聊用户发送；需 private_user_ids 非空，且宿主存在对应私聊会话，否则私聊渠道整体跳过",
+        json_schema_extra={"label": "允许发私聊", "order": 21.31},
+    )
+    private_user_ids: List[str] = Field(
+        default_factory=list,
+        description="自动自拍私聊接收者实际用户 ID 列表；平台沿用 group_image.platform，名单为空时私聊渠道整体关闭",
+        json_schema_extra={
+            "label": "私聊用户 ID",
+            "item_type": "string",
+            "placeholder": "[\"用户ID1\", \"用户ID2\"]",
+            "depends_on": "selfie.private_enabled",
+            "depends_value": True,
+            "order": 21.32,
+        },
+    )
     probability: float = Field(
         default=1.0, ge=0, le=1,
         description="定时自动自拍判断适合分享后的随机通过概率，1 全部通过、0 暂停；不影响聊天自拍、MaiTrace 调用或群话题随机图",
@@ -404,9 +422,19 @@ class SelfieSection(PluginConfigBase):
         },
     )
 
+    caption_mode: Literal["shared", "per_channel"] = Field(
+        default="shared",
+        description="自动自拍配文粒度：shared 多目标共用一条；per_channel 按空间 / 群 / 私聊各生成一条。caption_enabled=false 时统一使用固定配文",
+        json_schema_extra={
+            "label": "配文粒度",
+            "depends_on": "selfie.caption_enabled",
+            "depends_value": True,
+            "order": 25.1,
+        },
+    )
     caption_text: str = Field(
         default="记录一下此刻。", min_length=1, pattern=r"\S",
-        description="caption_enabled=false 时用于自动自拍和群角色照片的固定正文，不能全为空白；空间和群共用",
+        description="caption_enabled=false 时用于自动自拍和群角色照片的固定正文，不能全为空白；空间、群和私聊共用",
         json_schema_extra={"label": "固定配文", "order": 26},
     )
     cycle_timeout_seconds: int = Field(
@@ -486,6 +514,398 @@ class GroupImageSection(PluginConfigBase):
         if self.min_messages > self.context_messages:
             raise ValueError("group_image.context_messages 不能小于 min_messages")
         return self
+
+
+# ==================== 内置日程 ====================
+
+class ScheduleSection(PluginConfigBase):
+    """内置日程配置
+
+    日程库落在插件数据目录，模板兜底后用 LLM 覆盖生成；消费端统一映射为
+    绘卷 ActivityInfo，供聊天自拍、自动自拍和群主动图读取。
+    """
+
+    __ui_label__ = "内置日程"
+    __ui_icon__ = "calendar"
+    __ui_order__ = 7
+
+    enabled: bool = Field(
+        default=True,
+        description="启用内置日程库与日程消费；关闭后所有主动任务视为无日程，且不会回退到 MaiTrace 日程",
+        json_schema_extra={"label": "启用内置日程", "order": 1},
+    )
+    provider: Literal["builtin", "maitrace"] = Field(
+        default="builtin",
+        description="日程来源：builtin 使用本地日程库；maitrace 沿用外部 MaiTrace 接口。enabled=false 时不回退",
+        json_schema_extra={"label": "日程来源", "order": 2},
+    )
+    timezone: str = Field(
+        default="Asia/Shanghai",
+        description="日程生成与判断统一使用的 IANA 时区名，避免宿主机时区变化导致跨日错乱",
+        json_schema_extra={"label": "时区", "placeholder": "Asia/Shanghai", "order": 3},
+    )
+    llm_task_name: str = Field(
+        default="planner",
+        description="日程生成使用的 LLM 任务名，对应 MaiBot model_task_config 中的字段名",
+        json_schema_extra={"label": "日程 LLM 任务", "placeholder": "planner", "order": 4},
+    )
+    generation_timeout_seconds: int = Field(
+        default=180,
+        ge=10,
+        le=600,
+        description="单日日程 LLM 生成的总超时（秒），含多轮重试；超时保留已有模板数据",
+        json_schema_extra={"label": "生成总超时", "order": 5},
+    )
+    max_tokens: int = Field(
+        default=8192,
+        ge=512,
+        le=32768,
+        description="日程生成单次 LLM 调用的最大输出 token 数",
+        json_schema_extra={"label": "最大输出 token", "order": 6},
+    )
+    multi_round: bool = Field(
+        default=True,
+        description="质量不达标时是否进行多轮重新生成；关闭后只生成一次",
+        json_schema_extra={"label": "多轮生成", "order": 7},
+    )
+    max_rounds: int = Field(
+        default=2,
+        ge=1,
+        le=5,
+        description="多轮生成的最大轮数，含首轮；仅在 multi_round=true 时生效",
+        json_schema_extra={
+            "label": "最大轮数",
+            "depends_on": "schedule.multi_round",
+            "depends_value": True,
+            "order": 8,
+        },
+    )
+    quality_threshold: float = Field(
+        default=0.8,
+        ge=0,
+        le=1,
+        description="日程质量评估通过阈值，低于阈值时按 multi_round 决定是否重生成",
+        json_schema_extra={"label": "质量阈值", "step": 0.05, "order": 9},
+    )
+    min_activities: int = Field(
+        default=8,
+        ge=1,
+        le=96,
+        description="单日日程的最少活动条数，用于生成校验与质量评估",
+        json_schema_extra={"label": "最少活动数", "order": 10},
+    )
+    max_activities: int = Field(
+        default=15,
+        ge=1,
+        le=96,
+        description="单日日程的最多活动条数，用于生成校验与质量评估",
+        json_schema_extra={"label": "最多活动数", "order": 11},
+    )
+    auto_generate_time: str = Field(
+        default="00:30",
+        pattern=r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$",
+        description="每日自动生成次日日程的时刻（schedule.timezone 时区的 HH:MM）",
+        json_schema_extra={"label": "自动生成时刻", "placeholder": "00:30", "order": 12},
+    )
+    template_mode: Literal["auto", "rest_day"] = Field(
+        default="auto",
+        description="模板兜底模式：auto 按工作日 / 周末选择模板；rest_day 为保留值，本轮不启用",
+        json_schema_extra={"label": "模板模式", "order": 13},
+    )
+    history_days: int = Field(
+        default=3,
+        ge=0,
+        le=30,
+        description="生成新日程时读取的历史天数，用于避免连续几天活动重复",
+        json_schema_extra={"label": "历史参考天数", "order": 14},
+    )
+    retention_days: int = Field(
+        default=30,
+        ge=1,
+        le=3650,
+        description="日程库保留天数，超过后由清理任务删除旧记录",
+        json_schema_extra={"label": "数据保留天数", "order": 15},
+    )
+    snapshot_refresh_seconds: int = Field(
+        default=60,
+        ge=10,
+        le=3600,
+        description="内存日程快照的刷新间隔（秒）；刷新只读数据库，不调用 LLM",
+        json_schema_extra={"label": "快照刷新间隔", "order": 16},
+    )
+    schedule_identity: str = Field(
+        default="",
+        description="日程生成用的人设补充：身份、职业、日常角色定位；留空只用插件现有形象配置",
+        json_schema_extra={"label": "人设身份", "input_type": "textarea", "rows": 2, "order": 17},
+    )
+    schedule_interest: str = Field(
+        default="",
+        description="日程生成用的兴趣偏好，例如喜欢的活动、常去地点，供 LLM 安排日常",
+        json_schema_extra={"label": "兴趣偏好", "input_type": "textarea", "rows": 2, "order": 18},
+    )
+    schedule_lifestyle: str = Field(
+        default="",
+        description="日程生成用的作息与生活习惯，例如起床时间、午休习惯、夜间活动",
+        json_schema_extra={"label": "生活习惯", "input_type": "textarea", "rows": 2, "order": 19},
+    )
+    custom_prompt: str = Field(
+        default="",
+        description="追加到日程生成提示词末尾的自定义要求；留空不追加",
+        json_schema_extra={"label": "自定义提示词", "input_type": "textarea", "rows": 3, "order": 20},
+    )
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, value: str) -> str:
+        """拒绝无法识别的时区名，避免运行时每小时都因时区错误中断日程。"""
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError(f"未知时区: {value}") from exc
+        return value
+
+    @model_validator(mode="after")
+    def validate_activity_bounds(self) -> "ScheduleSection":
+        """最少活动数不能超过最多活动数，否则生成校验永远不可能通过。"""
+        if self.min_activities > self.max_activities:
+            raise ValueError("schedule.min_activities 不能大于 max_activities")
+        return self
+
+
+# ==================== 日程注入 ====================
+
+class InjectSection(PluginConfigBase):
+    """日程注入配置
+
+    Hook 内只读内存快照，不查库、不调 LLM；意图分类与节流用于避免每轮都污染提示词。
+    """
+
+    __ui_label__ = "日程注入"
+    __ui_icon__ = "message"
+    __ui_order__ = 8
+
+    enabled: bool = Field(
+        default=True,
+        description="日程注入总开关；关闭后规划器和回复器都不再追加日程内容",
+        json_schema_extra={"label": "启用日程注入", "order": 1},
+    )
+    inject_into_planner: bool = Field(
+        default=True,
+        description="是否在规划器请求前追加一条日程 UserMessageItem，供 LLM 规划时参考",
+        json_schema_extra={
+            "label": "注入规划器",
+            "depends_on": "inject.enabled",
+            "depends_value": True,
+            "order": 2,
+        },
+    )
+    inject_into_replyer: bool = Field(
+        default=True,
+        description="是否在回复器请求前把日程追加到 extra_prompt，影响最终回复措辞",
+        json_schema_extra={
+            "label": "注入回复器",
+            "depends_on": "inject.enabled",
+            "depends_value": True,
+            "order": 3,
+        },
+    )
+    enable_intent_classification: bool = Field(
+        default=True,
+        description="按用户消息意图决定是否注入；关闭后跳过意图判断，仅保留时间与消息数节流",
+        json_schema_extra={
+            "label": "意图分类",
+            "depends_on": "inject.enabled",
+            "depends_value": True,
+            "order": 4,
+        },
+    )
+    enable_state_analysis: bool = Field(
+        default=True,
+        description="分析当前活动状态（剩余时长、是否刚切换）并影响注入内容与时机",
+        json_schema_extra={
+            "label": "状态分析",
+            "depends_on": "inject.enabled",
+            "depends_value": True,
+            "order": 5,
+        },
+    )
+    enable_inject_optimization: bool = Field(
+        default=True,
+        description="启用节流优化：按最小间隔、最少消息数和闲聊概率控制注入频率",
+        json_schema_extra={
+            "label": "注入优化",
+            "depends_on": "inject.enabled",
+            "depends_value": True,
+            "order": 6,
+        },
+    )
+    casual_chat_inject_probability: float = Field(
+        default=0.5,
+        ge=0,
+        le=1,
+        description="闲聊场景随机注入概率；0 表示闲聊不注入，1 表示全部注入",
+        json_schema_extra={
+            "label": "闲聊注入概率",
+            "step": 0.05,
+            "depends_on": "inject.enable_inject_optimization",
+            "depends_value": True,
+            "order": 7,
+        },
+    )
+    context_max_turns: int = Field(
+        default=3,
+        ge=1,
+        le=20,
+        description="上下文缓存保留的最近对话轮数，用于判断话题是否延续",
+        json_schema_extra={
+            "label": "上下文轮数",
+            "depends_on": "inject.enabled",
+            "depends_value": True,
+            "order": 8,
+        },
+    )
+    context_ttl_seconds: int = Field(
+        default=600,
+        ge=10,
+        le=86400,
+        description="上下文缓存的有效期（秒），过期后不再沿用上一轮注入判断",
+        json_schema_extra={
+            "label": "上下文有效期",
+            "depends_on": "inject.enabled",
+            "depends_value": True,
+            "order": 9,
+        },
+    )
+    max_future_activities: int = Field(
+        default=3,
+        ge=0,
+        le=10,
+        description="注入内容中展示的未来日程条数；0 表示只展示当前活动",
+        json_schema_extra={
+            "label": "未来日程条数",
+            "depends_on": "inject.enabled",
+            "depends_value": True,
+            "order": 10,
+        },
+    )
+    min_seconds: int = Field(
+        default=300,
+        ge=0,
+        le=86400,
+        description="两次注入之间的最小间隔（秒），避免连续多轮重复追加日程",
+        json_schema_extra={
+            "label": "最小注入间隔",
+            "depends_on": "inject.enable_inject_optimization",
+            "depends_value": True,
+            "order": 11,
+        },
+    )
+    min_messages: int = Field(
+        default=5,
+        ge=1,
+        le=100,
+        description="同一会话至少累积的新消息数才允许再次注入",
+        json_schema_extra={
+            "label": "最少新消息",
+            "depends_on": "inject.enable_inject_optimization",
+            "depends_value": True,
+            "order": 12,
+        },
+    )
+    allowed_streams: List[str] = Field(
+        default_factory=list,
+        description="允许注入的会话 ID 白名单；留空表示不限制，填写后只有列表内的会话会注入",
+        json_schema_extra={
+            "label": "允许注入的会话",
+            "item_type": "string",
+            "placeholder": "[\"session_id\"]",
+            "order": 13,
+        },
+    )
+
+
+# ==================== QQ 空间 ====================
+
+class QzoneSection(PluginConfigBase):
+    """自研 QQ 空间发布配置
+
+    只做图文说说发布；Cookie 按 adapter / napcat / local 顺序解析，
+    任一环节失败只跳过空间渠道，不影响群和私聊。
+    """
+
+    __ui_label__ = "QQ 空间"
+    __ui_icon__ = "globe"
+    __ui_order__ = 9
+
+    enabled: bool = Field(
+        default=True,
+        description="启用空间发布渠道；关闭或 Cookie 不可用时自动跳过空间，群与私聊继续发送",
+        json_schema_extra={"label": "启用空间发布", "order": 1},
+    )
+    cookie_methods: List[Literal["adapter", "napcat", "local"]] = Field(
+        default_factory=lambda: ["adapter", "napcat", "local"],
+        description="Cookie 获取顺序，可调整或删除不需要的方式；全部失败时空间渠道跳过",
+        json_schema_extra={
+            "label": "Cookie 获取方式",
+            "item_type": "string",
+            "order": 2,
+        },
+    )
+    http_host: str = Field(
+        default="127.0.0.1",
+        description="NapCat HTTP 服务地址，仅在 cookie_methods 含 napcat 时使用",
+        json_schema_extra={
+            "label": "HTTP 地址",
+            "placeholder": "127.0.0.1",
+            "order": 3,
+        },
+    )
+    http_port: str = Field(
+        default="9999",
+        pattern=r"^\d{1,5}$",
+        description="NapCat HTTP 服务端口，仅在 cookie_methods 含 napcat 时使用",
+        json_schema_extra={"label": "HTTP 端口", "placeholder": "9999", "order": 4},
+    )
+    http_token: str = Field(
+        default="",
+        description="NapCat HTTP 服务的 Bearer Token；留空表示不发送 Authorization 头",
+        json_schema_extra={
+            "label": "HTTP Token",
+            "input_type": "password",
+            "order": 5,
+        },
+    )
+    adapter_priority: List[str] = Field(
+        default_factory=list,
+        description="优先尝试的适配器 API 名列表；留空按内置顺序筛选 adapter.snowluma.* 与 adapter.napcat.*",
+        json_schema_extra={
+            "label": "适配器优先级",
+            "item_type": "string",
+            "order": 6,
+        },
+    )
+    cookie_ttl_hours: int = Field(
+        default=6,
+        ge=1,
+        le=240,
+        description="本地 Cookie 缓存有效期（小时）；超期或发布返回鉴权错误时刷新一次",
+        json_schema_extra={"label": "Cookie 有效期", "order": 7},
+    )
+    publish_timeout_seconds: int = Field(
+        default=30,
+        ge=5,
+        le=120,
+        description="单次空间上传图片或发布说说的 HTTP 超时（秒）",
+        json_schema_extra={"label": "发布超时", "order": 8},
+    )
+
+    @field_validator("http_port")
+    @classmethod
+    def validate_http_port(cls, value: str) -> str:
+        """端口必须落在 1-65535，避免拼接出无法连接的 URL。"""
+        if not 1 <= int(value) <= 65535:
+            raise ValueError("qzone.http_port 必须在 1-65535 之间")
+        return value
 
 
 # ==================== ComfyUI ====================
@@ -948,13 +1368,16 @@ class ModelsSection(PluginConfigBase):
 
 # ==================== 根配置 ====================
 
-class MaisArtConfig(PluginConfigBase):
-    """麦麦绘卷根配置"""
+class PainterMaimaiConfig(PluginConfigBase):
+    """画家麦麦的日常根配置"""
 
     plugin: PluginSection = Field(default_factory=PluginSection)
     basic: BasicSection = Field(default_factory=BasicSection)
     selfie: SelfieSection = Field(default_factory=SelfieSection)
     group_image: GroupImageSection = Field(default_factory=GroupImageSection)
+    schedule: ScheduleSection = Field(default_factory=ScheduleSection)
+    inject: InjectSection = Field(default_factory=InjectSection)
+    qzone: QzoneSection = Field(default_factory=QzoneSection)
     comfyui: ComfyUISection = Field(default_factory=ComfyUISection)
     quota: QuotaSection = Field(default_factory=QuotaSection)
     proxy: ProxySection = Field(default_factory=ProxySection)

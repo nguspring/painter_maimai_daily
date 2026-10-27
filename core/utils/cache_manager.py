@@ -5,7 +5,7 @@ import hashlib
 import json
 import logging
 
-logger = logging.getLogger("plugin.mais_art_journal.cache")
+logger = logging.getLogger("plugin.painter_maimai_daily.cache")
 
 def request_cache_identity(model_config: Dict[str, Any], description: str, input_image_base64: Optional[str] = None) -> str:
     """完整参数与源图参与缓存身份，配置或参考图变化后不能复用旧生成结果。"""

@@ -11,7 +11,7 @@ import logging
 import re
 import shutil
 
-logger = logging.getLogger("plugin.mais_art_journal.config_backup")
+logger = logging.getLogger("plugin.painter_maimai_daily.config_backup")
 
 
 def backup_config_if_version_changed(

@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from ..request import GenerationRequest
     from ..step import PipelineContext
 
-logger = logging.getLogger("plugin.mais_art_journal.step.selfie_prompt")
+logger = logging.getLogger("plugin.painter_maimai_daily.step.selfie_prompt")
 
 
 class BuildSelfiePrompt(BaseStep):

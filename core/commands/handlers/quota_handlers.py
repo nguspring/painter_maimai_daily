@@ -10,11 +10,11 @@ from ...quota.store import QuotaStatus
 from ..registry import CommandResult, subcommand
 
 if TYPE_CHECKING:
-    from ....plugin import MaisArtPlugin
+    from ....plugin import PainterMaimaiPlugin
     from ..dispatcher import DispatcherContext
 
 
-logger = logging.getLogger("plugin.mais_art_journal.quota")
+logger = logging.getLogger("plugin.painter_maimai_daily.quota")
 
 
 def _status_text(context: QuotaContext, status: QuotaStatus) -> str:
@@ -38,7 +38,7 @@ def _usage(prefix: str) -> str:
 
 
 @subcommand("quota", aliases=("额度", "配额"))
-async def cmd_quota(plugin: "MaisArtPlugin", dctx: "DispatcherContext", args: str) -> CommandResult:
+async def cmd_quota(plugin: "PainterMaimaiPlugin", dctx: "DispatcherContext", args: str) -> CommandResult:
     """操作范围固定为当前真实聊天流，不能通过参数指定另一群或用户。"""
     tokens = args.split(maxsplit=1)
     action = tokens[0].lower() if tokens else "status"

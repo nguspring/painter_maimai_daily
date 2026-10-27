@@ -16,7 +16,7 @@ from .prompt_policy import strip_prompt_weights, uses_weighted_tags
 if TYPE_CHECKING:
     from maibot_sdk.context import PluginContext
 
-logger = logging.getLogger("plugin.mais_art_journal.optimizer")
+logger = logging.getLogger("plugin.painter_maimai_daily.optimizer")
 
 # 保留旧模块导出；完整编辑规则来自三语言模板，不再固定为 SD 权重。
 OPTIMIZER_SYSTEM_PROMPT = "You are a professional visual prompt editor. Preserve the requested content, composition and medium, and use the specified backend syntax."

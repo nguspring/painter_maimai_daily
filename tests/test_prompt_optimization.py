@@ -9,14 +9,14 @@ import json
 import pytest
 import re
 
-from mais_art_journal.core.pipeline import Pipeline
-from mais_art_journal.core.pipeline.request import GenerationRequest
-from mais_art_journal.core.pipeline.steps.merge_negative_prompt import MergeNegativePrompt
-from mais_art_journal.core.pipeline.steps.optimize_prompt import OptimizePrompt
-from mais_art_journal.core.prompts import build_auto_selfie_prompt, selfie_prompt_builder
-from mais_art_journal.core.prompts.prompt_templates import load_prompt_template
-from mais_art_journal.core.selfie.schedule_provider import ActivityInfo, ActivityType
-from mais_art_journal.core.utils.prompt_optimizer import optimize_prompt
+from painter_maimai_daily.core.pipeline import Pipeline
+from painter_maimai_daily.core.pipeline.request import GenerationRequest
+from painter_maimai_daily.core.pipeline.steps.merge_negative_prompt import MergeNegativePrompt
+from painter_maimai_daily.core.pipeline.steps.optimize_prompt import OptimizePrompt
+from painter_maimai_daily.core.prompts import build_auto_selfie_prompt, selfie_prompt_builder
+from painter_maimai_daily.core.prompts.prompt_templates import load_prompt_template
+from painter_maimai_daily.core.selfie.schedule_provider import ActivityInfo, ActivityType
+from painter_maimai_daily.core.utils.prompt_optimizer import optimize_prompt
 
 
 @pytest.mark.parametrize("backend,syntax,expected", [

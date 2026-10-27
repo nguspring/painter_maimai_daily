@@ -6,7 +6,7 @@
 import logging
 from typing import Dict, Any
 
-logger = logging.getLogger("plugin.mais_art_journal.model_utils")
+logger = logging.getLogger("plugin.painter_maimai_daily.model_utils")
 
 
 def merge_negative_prompt(

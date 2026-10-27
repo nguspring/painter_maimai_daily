@@ -8,17 +8,17 @@ import logging
 from ..registry import CommandResult, subcommand
 
 if TYPE_CHECKING:
-    from ....plugin import MaisArtPlugin
+    from ....plugin import PainterMaimaiPlugin
     from ..dispatcher import DispatcherContext
 
-logger = logging.getLogger("plugin.mais_art_journal.cmd.selfie")
+logger = logging.getLogger("plugin.painter_maimai_daily.cmd.selfie")
 
 _VALID_STYLES = {"auto", "standard", "mirror", "photo"}
 _STYLE_LABELS = {"auto": "按活动自动构图", "standard": "标准自拍", "mirror": "对镜自拍", "photo": "第三人称照片"}
 
 
 @subcommand("selfie", admin=True)
-async def cmd_selfie(plugin: "MaisArtPlugin", dctx: "DispatcherContext", args: str) -> CommandResult:
+async def cmd_selfie(plugin: "PainterMaimaiPlugin", dctx: "DispatcherContext", args: str) -> CommandResult:
     """/dr selfie on|off|auto|standard|mirror|photo"""
     action = args.strip().lower()
 

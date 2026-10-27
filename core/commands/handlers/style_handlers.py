@@ -8,14 +8,14 @@ from ...config import get_style_prompt, list_styles, resolve_style_alias
 from ..registry import CommandResult, subcommand
 
 if TYPE_CHECKING:
-    from ...plugin import MaisArtPlugin
+    from ...plugin import PainterMaimaiPlugin
     from ..dispatcher import DispatcherContext
 
-logger = logging.getLogger("plugin.mais_art_journal.cmd.style")
+logger = logging.getLogger("plugin.painter_maimai_daily.cmd.style")
 
 
 @subcommand("styles", admin=False)
-async def cmd_styles(plugin: "MaisArtPlugin", dctx: "DispatcherContext", args: str) -> CommandResult:
+async def cmd_styles(plugin: "PainterMaimaiPlugin", dctx: "DispatcherContext", args: str) -> CommandResult:
     """/dr styles — 列出所有可用风格"""
     styles = list_styles(plugin)
     if not styles:
@@ -38,7 +38,7 @@ async def cmd_styles(plugin: "MaisArtPlugin", dctx: "DispatcherContext", args: s
 
 
 @subcommand("style", admin=True)
-async def cmd_style(plugin: "MaisArtPlugin", dctx: "DispatcherContext", args: str) -> CommandResult:
+async def cmd_style(plugin: "PainterMaimaiPlugin", dctx: "DispatcherContext", args: str) -> CommandResult:
     """/dr style <风格名> — 显示风格详情"""
     style_name = (args or "").strip()
     if not style_name:

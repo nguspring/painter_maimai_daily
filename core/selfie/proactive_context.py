@@ -12,7 +12,7 @@ from ..utils.time_utils import is_in_time_range
 from .schedule_provider import ActivityInfo, ScheduleProvider
 
 if TYPE_CHECKING:
-    from ...plugin import MaisArtPlugin
+    from ...plugin import PainterMaimaiPlugin
 
 
 @dataclass
@@ -59,7 +59,7 @@ def recent_context(messages: Any, *, session_id: str, earliest: float) -> List[D
     return collected
 
 
-def group_allowed(plugin: "MaisArtPlugin", group_id: str, session_id: str = "") -> bool:
+def group_allowed(plugin: "PainterMaimaiPlugin", group_id: str, session_id: str = "") -> bool:
     cfg = plugin.config.group_image
     quiet = cfg.quiet_hours_start != cfg.quiet_hours_end and is_in_time_range(cfg.quiet_hours_start, cfg.quiet_hours_end)
     return (
@@ -68,7 +68,7 @@ def group_allowed(plugin: "MaisArtPlugin", group_id: str, session_id: str = "") 
     )
 
 
-async def read_group_context(plugin: "MaisArtPlugin", group_id: str) -> Optional[GroupContext]:
+async def read_group_context(plugin: "PainterMaimaiPlugin", group_id: str) -> Optional[GroupContext]:
     if not group_allowed(plugin, group_id):
         return None
     cfg = plugin.config.group_image
@@ -96,7 +96,7 @@ async def read_group_context(plugin: "MaisArtPlugin", group_id: str) -> Optional
     )
 
 
-def proactive_model(plugin: "MaisArtPlugin", *, is_selfie: bool, automatic: bool = False) -> str:
+def proactive_model(plugin: "PainterMaimaiPlugin", *, is_selfie: bool, automatic: bool = False) -> str:
     """使用与生图 API 相同的回退顺序，在生成前检查群内模型开关。"""
     configured = plugin.config.selfie.selfie_model if automatic else plugin.config.group_image.model_id
     if configured.strip():
@@ -119,12 +119,12 @@ def activity_arguments(activity: Optional[ActivityInfo]) -> Dict[str, str]:
 
 
 def activity_block_reason(
-    plugin: "MaisArtPlugin", activity: Optional[ActivityInfo], *, automatic: bool = False,
+    plugin: "PainterMaimaiPlugin", activity: Optional[ActivityInfo], *, automatic: bool = False,
     group: bool = False, before_generation: bool = False,
 ) -> str:
     """所有主动入口使用同一日程/生活门槛，渠道禁用配置可叠加。"""
     if activity is None:
-        return "MaiTrace 当前没有有效日程"
+        return "当前没有有效日程"
     if automatic and activity.activity_type in plugin.config.selfie.disabled_activity_types:
         return "当前活动禁止主动自拍"
     if group and activity.activity_type in plugin.config.group_image.disabled_activity_types:
@@ -136,7 +136,7 @@ def activity_block_reason(
 
 
 async def recheck_activity(
-    plugin: "MaisArtPlugin", original: ActivityInfo, provider: ScheduleProvider,
+    plugin: "PainterMaimaiPlugin", original: ActivityInfo, provider: ScheduleProvider,
     *, automatic: bool = False, group: bool = False,
 ) -> str:
     """临发送重新读公开日程，生成期间活动/地点/服装变化时丢弃本轮结果。"""

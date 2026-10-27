@@ -1,3 +1,20 @@
+# 4.0.0
+
+## 主要功能
+
+- 新增内置日程库：模板兜底 + LLM 多轮生成 + 质量评估 + 历史记忆，默认独立运行，可选 `provider=maitrace`。
+- 新增日程注入：通过 `maisaka.planner.before_request` 与 `maisaka.replyer.before_request` 注入内存快照，支持意图分类、冷却、消息数阈值和会话白名单。
+- 自动自拍改为多渠道：同一轮可同时发往 QQ 空间、多个允许群和私聊名单，各渠道独立冷却与结算。
+- 新增自研 QQ 空间图文说说发布链路（Cookie 适配器 / NapCat HTTP / 本地缓存），空间失败不影响群和私聊。
+- 新增 `/dr schedule` 与管理员命令 `/dr schedule regen`。
+
+## 细节
+
+- 手动生成、群话题图片和额度逻辑保持不变；日程关闭时主动任务视为无日程，不回退 MaiTrace。
+- 多渠道只生成一张图，配文支持 `shared` / `per_channel`。
+- 新增 `httpx` 依赖；manifest 版本升至 4.0.0。
+- 修复 QQ 空间发布鉴权：请求补齐 `Cookie` 头，`richval` 改为网页端格式，并移除多余的 `pic_bo`。
+
 # 4.6.3
 
 ## 主要功能

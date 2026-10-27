@@ -10,14 +10,14 @@ import json
 import pytest
 import threading
 
-from mais_art_journal.core.commands.dispatcher import CommandDispatcher, DispatcherContext
-from mais_art_journal.core.commands.help_renderer import render_current_config
-from mais_art_journal.core.pipeline.factories import build_request_from_tool_kwargs
-from mais_art_journal.core.pipeline.request import GenerationRequest
-from mais_art_journal.core.pipeline.steps.resolve_model import ResolveModel
-from mais_art_journal.core.state import RuntimeStateManager, StatePersistenceError
-from mais_art_journal.core.state import runtime_state as state_module
-from mais_art_journal.plugin import MaisArtPlugin
+from painter_maimai_daily.core.commands.dispatcher import CommandDispatcher, DispatcherContext
+from painter_maimai_daily.core.commands.help_renderer import render_current_config
+from painter_maimai_daily.core.pipeline.factories import build_request_from_tool_kwargs
+from painter_maimai_daily.core.pipeline.request import GenerationRequest
+from painter_maimai_daily.core.pipeline.steps.resolve_model import ResolveModel
+from painter_maimai_daily.core.state import RuntimeStateManager, StatePersistenceError
+from painter_maimai_daily.core.state import runtime_state as state_module
+from painter_maimai_daily.plugin import PainterMaimaiPlugin
 from maibot_sdk import PluginPaths
 
 
@@ -25,11 +25,11 @@ SESSION_ID = "existing-group-session"
 OTHER_SESSION_ID = "existing-private-session"
 
 
-def make_plugin(tmp_path: Path) -> MaisArtPlugin:
+def make_plugin(tmp_path: Path) -> PainterMaimaiPlugin:
     """只注入内存配置和消息替身，持久化文件全部落在测试临时目录。"""
-    plugin = MaisArtPlugin()
+    plugin = PainterMaimaiPlugin()
     plugin.set_plugin_config({
-        "plugin": {"enabled": True, "config_version": MaisArtPlugin.config_model().plugin.config_version},
+        "plugin": {"enabled": True, "config_version": PainterMaimaiPlugin.config_model().plugin.config_version},
         "basic": {
             "admin_users": ["admin"], "default_txt2img_model": "model1", "pic_command_model": "model1",
             "prompt_optimizer_enabled": False, "auto_recall_enabled": False,

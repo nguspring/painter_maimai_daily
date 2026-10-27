@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from maibot_sdk.context import PluginContext
 
 
-logger = logging.getLogger("plugin.mais_art_journal.selfie_builder")
+logger = logging.getLogger("plugin.painter_maimai_daily.selfie_builder")
 
 
 # 简单自然的动作池；无明确动作时保持放松，不强制复杂手势或额外道具。

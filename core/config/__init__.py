@@ -10,7 +10,7 @@ from .model_registry import (
 )
 from .models import (
     ComfyUISection,
-    MaisArtConfig,
+    PainterMaimaiConfig,
     ModelConfig,
     ModelsSection,
     StylePreset,
@@ -19,7 +19,7 @@ from .models import (
 from .style_registry import get_style_prompt, list_styles, resolve_style_alias
 
 __all__ = [
-    "MaisArtConfig",
+    "PainterMaimaiConfig",
     "ComfyUISection",
     "ModelConfig",
     "ModelsSection",

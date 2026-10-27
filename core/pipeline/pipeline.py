@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from .request import GenerationRequest
     from .step import PipelineContext, PipelineStep
 
-logger = logging.getLogger("plugin.mais_art_journal.pipeline")
+logger = logging.getLogger("plugin.painter_maimai_daily.pipeline")
 
 
 def _generation_deadline_seconds(ctx: "PipelineContext", req: "GenerationRequest") -> float:

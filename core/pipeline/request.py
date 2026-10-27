@@ -62,7 +62,7 @@ class GenerationRequest:
     user_id: str = ""
     group_id: str = ""
     platform: str = ""
-    log_prefix: str = "[MaisArt]"
+    log_prefix: str = "[PainterMaimai]"
     command_message: Any = None
     source: SourceLiteral = "tool"
 
