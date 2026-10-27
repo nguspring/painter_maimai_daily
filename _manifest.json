@@ -13,13 +13,13 @@
   },
   "author": {
     "name": "Ptrel, Rabbit-Jia-Er, saberlights Kiuon, nguspring",
-    "url": "https://github.com/nguspring/selfie_painter"
+    "url": "https://github.com/nguspring/painter_maimai_daily"
   },
   "license": "AGPL-3.0-or-later",
   "urls": {
-    "repository": "https://github.com/nguspring/selfie_painter",
-    "homepage": "https://github.com/nguspring/selfie_painter",
-    "issues": "https://github.com/nguspring/selfie_painter/issues"
+    "repository": "https://github.com/nguspring/painter_maimai_daily",
+    "homepage": "https://github.com/nguspring/painter_maimai_daily",
+    "issues": "https://github.com/nguspring/painter_maimai_daily/issues"
   },
   "host_application": {
     "min_version": "1.3.11",

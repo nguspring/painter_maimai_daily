@@ -111,7 +111,7 @@
 2. 克隆本仓库，指定目录名为 `painter_maimai_daily`：
 
    ```shell
-   git clone https://github.com/nguspring/selfie_painter.git painter_maimai_daily
+   git clone https://github.com/nguspring/painter_maimai_daily.git painter_maimai_daily
    ```
 
 3. 在 MaiBot 使用的 Python 环境中安装插件依赖：
@@ -514,7 +514,7 @@ API 返回错误时，先查看日志中的服务端 `message`：
 
 ## 贡献和反馈
 
-- **制作者水平有限，任何漏洞、疑问或建议,欢迎提交 [Issue](https://github.com/nguspring/selfie_painter/issues) 或 Pull Request！**
+- **制作者水平有限，任何漏洞、疑问或建议,欢迎提交 [Issue](https://github.com/nguspring/painter_maimai_daily/issues) 或 Pull Request！**
 - **作者QQ：1021143806,3082618311或群1025591815（部分请求可能被过滤导致回复不及时，请见谅）**
 - **其余问题请联系作者修复或解决**
 
@@ -537,4 +537,4 @@ API 返回错误时，先查看日志中的服务端 `message`：
 
 - 作者：Ptrel, Rabbit-Jia-Er, saberlights Kiuon
 - 许可证：AGPL-3.0-or-later
-- 项目主页：https://github.com/nguspring/selfie_painter
+- 项目主页：https://github.com/nguspring/painter_maimai_daily
