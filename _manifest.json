@@ -1,6 +1,6 @@
 {
   "manifest_version": 2,
-  "version": "4.0.0",
+  "version": "4.0.1",
   "name": "画家麦麦的日常",
   "description": "基于 MaiBot 的多模型智能绘图插件，支持原生 NovelAI、OpenAI、Gemini、豆包、百炼、ComfyUI 等接口。提供内置日程与日程注入、空间/群/私聊多渠道自动自拍、群聊主动图片、聊天设置持久化、额度管理和对外生图 API，并可选对接 MaiTrace。",
   "plugin_type": "creative",

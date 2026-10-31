@@ -32,7 +32,7 @@ def _generation_deadline_seconds(ctx: "PipelineContext", req: "GenerationRequest
     try:
         base_timeout = float(ctx.plugin.config.basic.generation_timeout_seconds)
     except (AttributeError, TypeError, ValueError):
-        base_timeout = 170.0
+        base_timeout = 240.0
 
     try:
         model_id = str(req.model_id or "").strip()

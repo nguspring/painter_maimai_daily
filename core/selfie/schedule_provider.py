@@ -24,18 +24,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger("plugin.painter_maimai_daily.schedule")
 _PLANNING_API_NAME = "Rabbit-Jia-Er.MaiTrace.get_current_activity"
 _TIME_WINDOW_PATTERN = re.compile(r"(\d{1,2}):(\d{2})\s*[-~～至]\s*(\d{1,2}):(\d{2})")
-_BREAK_PATTERN = re.compile(
-    r"休息|休憩|课间|下班|饭后|餐后|跑完|做完|刚完成|完成后|结束后|"
-    r"\b(?:on|taking|during)\s+(?:a\s+)?break\b|\b(?:finished|completed)\b|"
-    r"\bafter\s+(?:work|class|studying|cooking|exercise|running|lunch|dinner)\b|休憩|終わった|終えた",
-    re.IGNORECASE,
-)
 _DRIVING_PATTERN = re.compile(r"开车|驾驶|骑车|骑行|\b(?:driving|cycling|riding a bike)\b|運転|自転車", re.IGNORECASE)
 _DRIVING_FINISHED_PATTERN = re.compile(
     r"(?:开车|驾驶|骑车|骑行)(?:结束后|后)(?:.*?)(?:休息|休憩)|结束驾驶|开完车|"
     r"\b(?:finished|after)\s+(?:driving|cycling)\b|運転を終えた|サイクリング後の休憩", re.IGNORECASE,
 )
-_FOCUS_PATTERN = re.compile(r"开会|会议|考试|专注|赶工|赶稿|写代码|\b(?:meeting|exam|focused work|coding)\b|会議|試験", re.IGNORECASE)
 
 
 class ActivityType(str, Enum):
@@ -156,12 +149,6 @@ class ActivityInfo:
         text = f"{self.description} {self.scene}"
         if _DRIVING_PATTERN.search(text) and not _DRIVING_FINISHED_PATTERN.search(text):
             return "正在驾驶或骑行"
-        taking_break = bool(_BREAK_PATTERN.search(text))
-        if not taking_break and (self.activity_type in {
-            ActivityType.WORKING, ActivityType.STUDYING, ActivityType.EXERCISING,
-            ActivityType.COOKING, ActivityType.GAMING, ActivityType.SELF_CARE, ActivityType.EATING,
-        } or _FOCUS_PATTERN.search(text)):
-            return "当前活动需要专注，尚未进入休息时间"
         if self.activity_type == ActivityType.WAKING_UP and not re.search(r"已清醒|清醒后|fully awake|目が覚めて", text, re.IGNORECASE):
             return "刚起床，尚未确认清醒"
         if not self.as_of and not self.time_window:

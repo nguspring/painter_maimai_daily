@@ -611,7 +611,7 @@ class PainterMaimaiPlugin(MaiBotPlugin):
 
     @Command(
         "dr",
-        timeout_ms=240000,
+        timeout_ms=300000,
         description="画家麦麦的日常命令套件（生图 / 模型管理 / 风格管理 / 自拍开关 / 额度）。命令前缀可在「基础配置.命令前缀」修改后重启 MaiBot 生效",
         pattern=r"^\s*(?:\[(?=[^\]]*(?:图片|image|表情|emoji))(?:[^\[\]]|\[[^\]]*\])*\]\s*)*(?:.*，说：\s*)?/dr(?:\s+(?P<rest>.+))?$",
     )

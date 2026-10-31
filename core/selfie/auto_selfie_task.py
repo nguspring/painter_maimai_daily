@@ -286,11 +286,13 @@ class AutoSelfieTask:
         finished: set[str] = set()
 
         async def finish(token: str, status: str, reason: str) -> None:
-            """保证每个预占只结算一次。"""
+            """保证每个预占只结算一次；本轮失败时释放冷却，下一个检查点可重试。"""
             if token in finished:
                 return
             finished.add(token)
-            await self.plugin.proactive_state.finish(token, status, reason)
+            await self.plugin.proactive_state.finish(
+                token, status, reason, release_cooldown=status == "failed",
+            )
 
         async def finish_all(status: str, reason: str) -> None:
             """批量结算尚未处理的目标。"""

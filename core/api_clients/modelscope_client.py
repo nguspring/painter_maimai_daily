@@ -5,13 +5,28 @@ import base64
 import requests
 from typing import Dict, Any, Tuple
 
-from .base_client import BaseApiClient, logger
+from .base_client import BaseApiClient, NonRetryableError, logger
+
+# 单次异步任务愿意等多久，由 basic.generation_timeout_seconds 推导：总预算越小，
+# 单次等待同步收窄，保证"一轮轮询"永远装得进"本次生图总时限"，不会出现外层
+# 超时先掐断轮询、图片其实快好了却被丢掉的情况。
+MAX_POLL_SECONDS = 180.0      # 平台拥堵时也愿意等到的上限
+MIN_POLL_SECONDS = 45.0       # 总预算很小时，至少给平台留的等待
+BUDGET_MARGIN_SECONDS = 45.0  # 提示词构造、结果下载和调度余量
 
 
 class ModelscopeClient(BaseApiClient):
     """魔搭社区API客户端"""
 
     format_name = "modelscope"
+
+    def _resolve_max_poll_seconds(self) -> float:
+        """按总预算推导单次轮询上限（秒）。"""
+        try:
+            budget = float(self.ctx.get_config("basic.generation_timeout_seconds", 240) or 240)
+        except (TypeError, ValueError):
+            budget = 240.0
+        return max(MIN_POLL_SECONDS, min(MAX_POLL_SECONDS, budget - BUDGET_MARGIN_SECONDS))
 
     def _make_request(
         self,
@@ -120,17 +135,18 @@ class ModelscopeClient(BaseApiClient):
                 "X-ModelScope-Task-Type": "image_generation"
             }
 
-            # 优化轮询策略：前期快速轮询，后期降低频率
-            # 总共最多 120 秒（2分钟）
-            max_poll_time = 120  # 最大轮询时间（秒）
+            # 优化轮询策略：前期快速轮询，后期降低频率；总时长跟着生图总预算走
+            max_poll_time = self._resolve_max_poll_seconds()
             poll_intervals = [2, 2, 3, 3, 5, 5, 5, 5, 5, 5, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]  # 轮询间隔序列
             start_time = time.time()
 
             for poll_index, interval in enumerate(poll_intervals):
                 # 检查是否超时
                 if time.time() - start_time > max_poll_time:
-                    logger.error(f"{self.log_prefix} (魔搭) 任务超时（{max_poll_time}秒），未能在规定时间内完成")
-                    return False, f"任务执行超时（超过{max_poll_time}秒）"
+                    logger.error(f"{self.log_prefix} (魔搭) 任务超时（{int(max_poll_time)}秒），未能在规定时间内完成")
+                    # 平台已经排队超过单次预算：此时重试只会再提交一个任务、把队列越堆越长，
+                    # 而且总预算装不下第二次轮询。直接交给任务的下一轮重试，不在这里重复提交。
+                    raise NonRetryableError(f"任务执行超时（超过{int(max_poll_time)}秒），平台排队过久，本轮不重复提交")
 
                 try:
                     status_url = f"{base_url}/tasks/{task_id}"
@@ -203,9 +219,11 @@ class ModelscopeClient(BaseApiClient):
                     time.sleep(interval)
                     continue
 
-            logger.error(f"{self.log_prefix} (魔搭) 任务超时（{max_poll_time}秒），未能在规定时间内完成")
-            return False, f"任务执行超时（超过{max_poll_time}秒）"
+            logger.error(f"{self.log_prefix} (魔搭) 任务超时（{int(max_poll_time)}秒），未能在规定时间内完成")
+            raise NonRetryableError(f"任务执行超时（超过{int(max_poll_time)}秒），平台排队过久，本轮不重复提交")
 
+        except NonRetryableError:
+            raise
         except Exception as e:
             logger.error(f"{self.log_prefix} (魔搭) 请求异常: {e!r}", exc_info=True)
             return False, f"请求失败: {str(e)}"

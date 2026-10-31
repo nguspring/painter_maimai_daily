@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/版本-v4.0.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/版本-v4.0.1-blue" alt="Version">
   <img src="https://img.shields.io/badge/MaiBot-1.3.x-green" alt="MaiBot">
   <img src="https://img.shields.io/badge/License-AGPL--3.0--or--later-orange" alt="License">
 </p>
@@ -26,7 +26,7 @@
 | 上游原版 | [mais-art-journal](https://github.com/1021143806/mais-art-journal)（原作者 1021143806 / Ptrel） |
 | 本仓库 | https://github.com/nguspring/painter_maimai_daily |
 | 旧版 selfie_painter | 旧 main 保存在标签 `legacy-selfie-painter-v3.6.10` |
-| 当前版本 | v4.0.0 |
+| 当前版本 | v4.0.1 |
 
 画图底座、API 客户端、部分自拍与命令逻辑来自上游；内置日程增强、日程注入、多渠道自动自拍、自研 QQ 空间发布、额度与二改适配由 nguspring 维护。转载或二次开发请保留上游署名与 AGPL-3.0 许可证。
 

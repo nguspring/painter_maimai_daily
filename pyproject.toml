@@ -1,6 +1,6 @@
 [project]
 name = "painter-maimai-daily"
-version = "4.0.0"
+version = "4.0.1"
 description = "画家麦麦的日常：多模型生图、原生 NovelAI、内置日程、日程注入与多渠道自拍"
 license = "AGPL-3.0-or-later"
 requires-python = ">=3.12"

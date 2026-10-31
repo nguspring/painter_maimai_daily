@@ -119,10 +119,10 @@ class BasicSection(PluginConfigBase):
         },
     )
     max_retries: int = Field(
-        default=2,
+        default=1,
         ge=0,
         le=10,
-        description="图片 API 首次请求之外的重试次数，0 不重试；受生图总超时限制。不可重试错误、ComfyUI 排队和 NovelAI 已接收后的异常不重发",
+        description="图片 API 首次请求之外的重试次数，0 不重试；受生图总超时限制。不可重试错误、ComfyUI 排队、平台排队超时和 NovelAI 已接收后的异常不重发",
         json_schema_extra={"label": "重试次数", "order": 26},
     )
     enable_debug_info: bool = Field(
@@ -189,8 +189,8 @@ class BasicSection(PluginConfigBase):
         json_schema_extra={"label": "辅助 LLM 超时", "order": 62},
     )
     generation_timeout_seconds: int = Field(
-        default=170, ge=10, le=600,
-        description="普通后端完整生图总超时（秒），含 LLM、图片请求和重试；YesNovelAI 建议 420 秒；ComfyUI 内部至少预留 wait_seconds+60 秒，外层 API/任务时限仍生效",
+        default=240, ge=10, le=600,
+        description="普通后端完整生图总超时（秒），含 LLM、图片请求和重试；魔搭单次异步等待按该值自动收窄（总预算减 45 秒，上限 180 秒）。YesNovelAI 建议 420 秒；ComfyUI 内部至少预留 wait_seconds+60 秒，外层 API/任务时限仍生效",
         json_schema_extra={"label": "生图总超时", "order": 63},
     )
     proactive_min_energy: float = Field(
@@ -444,7 +444,7 @@ class SelfieSection(PluginConfigBase):
     )
     disabled_activity_types: List[ActivityType] = Field(
         default_factory=lambda: [ActivityType.SLEEPING, ActivityType.BATHING],
-        description="这些活动禁止定时自动自拍和群话题角色照片；普通群图由 group_image.disabled_activity_types 控制。睡眠、洗澡、低精力和专注活动另有硬限制",
+        description="这些活动禁止定时自动自拍和群话题角色照片；普通群图由 group_image.disabled_activity_types 控制。睡眠、洗澡和低精力另有硬限制",
         json_schema_extra={"label": "禁止自动自拍的活动", "order": 27},
     )
     activity_rules: List[ActivityRule] = Field(
@@ -502,7 +502,7 @@ class GroupImageSection(PluginConfigBase):
     model_id: str = Field(default="", description="群话题图片专用模型，普通图和角色照片均优先用它；留空时普通图用默认文生图，角色照片先沿用 llm_selfie_model，再按参考图选默认模型", json_schema_extra={"label": "群话题生图模型", "order": 12})
     disabled_activity_types: List[ActivityType] = Field(
         default_factory=lambda: [ActivityType.SLEEPING, ActivityType.BATHING],
-        description="这些活动期间不主动发群图；所有主动图都要求有效日程，睡眠、低精力和专注活动另有统一限制",
+        description="这些活动期间不主动发群图；所有主动图都要求有效日程，睡眠和低精力另有统一限制",
         json_schema_extra={"label": "禁止主动发图的活动"},
     )
     cycle_timeout_seconds: int = Field(

@@ -291,7 +291,14 @@ class ProactiveStateStore:
 
         return await self._change(change)
 
-    async def finish(self, token: str, status: str, reason: str = "") -> None:
+    async def finish(self, token: str, status: str, reason: str = "", *, release_cooldown: bool = False) -> None:
+        """结算一次预占。
+
+        ``release_cooldown`` 只用于"本轮真的失败、值得尽快再试"的场景：预占时
+        已经写入的渠道冷却会被清零，下一轮检查（受 check_interval 和失败退避
+        控制）就能重试，而不是被 interval_minutes 的整段冷却压住。
+        结算状态不是 failed 时该参数不生效，避免把已发出的记录重新放行。
+        """
         if status not in _OUTCOMES - {"reserved"}:
             raise ValueError("主动图片结算状态无效")
 
@@ -300,4 +307,12 @@ class ProactiveStateStore:
             record["status"] = status
             if reason:
                 record["reason"] = reason[:200]
+            if not release_cooldown or status != "failed":
+                return
+            # 只回滚属于本次预占的时间戳：并发或后续轮次可能已经写入更新的冷却。
+            target_state = data["targets"].get(record["target"])
+            if target_state is not None and target_state["last_attempt"] == record["created_at"]:
+                target_state["last_attempt"] = 0.0
+            if record["source"] and data["sources"].get(record["source"]) == record["created_at"]:
+                data["sources"][record["source"]] = 0.0
         await self._change(change)

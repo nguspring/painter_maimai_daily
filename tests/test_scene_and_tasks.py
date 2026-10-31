@@ -421,6 +421,31 @@ def test_auto_rejected_space_result_is_recorded_as_failed(monkeypatch: pytest.Mo
     plugin.qzone_publisher.publish.assert_awaited_once()
 
 
+def test_generation_failure_releases_cooldown_for_the_next_check(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    """本轮生图失败不能吃满整个 interval_minutes 冷却：下一个检查点必须还能再试一次。"""
+    plugin = make_plugin(tmp_path, selfie={
+        "private_enabled": True, "private_user_ids": ["u1"],
+        "qzone_enabled": False, "group_enabled": False,
+    })
+    mock_schedule(monkeypatch, auto_selfie_task, resting_activity())
+    plugin.ctx.llm.generate.return_value = {"success": True, "response": json.dumps({
+        "destinations": ["private_1"], "reason": "想分享此刻", "prompt": "客厅休息时的自拍",
+    })}
+    monkeypatch.setattr(
+        plugin, "api_generate_image", AsyncMock(return_value={"success": False, "error": "平台排队过久"}),
+    )
+
+    with pytest.raises(RuntimeError, match="平台排队过久"):
+        asyncio.run(AutoSelfieTask(plugin)._execute_selfie())
+
+    assert plugin.proactive_state.recent()[-1]["status"] == "failed"
+    assert plugin.proactive_state.available(
+        "private:private-session", 7200, source="auto_selfie", source_cooldown=7200,
+    )
+
+
 def test_auto_cancel_during_generation_never_publishes_late_result(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     plugin = make_plugin(tmp_path)
     mock_schedule(monkeypatch, auto_selfie_task, resting_activity())
@@ -629,7 +654,7 @@ def test_failed_group_start_cleans_up_the_already_started_auto_task(
 
 
 @pytest.mark.parametrize("source", ["selfie", "group"])
-@pytest.mark.parametrize("condition", ["missing", "no_time", "stale", "busy", "low_energy", "sleep_phase"])
+@pytest.mark.parametrize("condition", ["missing", "no_time", "stale", "low_energy", "sleep_phase"])
 def test_all_proactive_images_require_an_eligible_schedule(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, source: str, condition: str,
 ) -> None:
@@ -641,9 +666,6 @@ def test_all_proactive_images_require_an_eligible_schedule(
         activity.as_of = ""
     elif condition == "stale":
         activity.as_of = (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat()
-    elif condition == "busy":
-        activity.activity_type = ActivityType.WORKING
-        activity.description = "专注整理技术文档"
     elif condition == "low_energy":
         activity.energy = 20
     elif condition == "sleep_phase":
@@ -855,6 +877,24 @@ def test_schedule_timing_rejects_stale_invalid_and_out_of_window_snapshots(
     assert (reason == "") if not expected else expected in reason
     if not expected:
         assert activity.remaining_seconds(now=now) == 1800
+
+
+@pytest.mark.parametrize("activity_type,description", [
+    (ActivityType.WORKING, "在物流公司分拣理货，单子多到飞起"),
+    (ActivityType.STUDYING, "专注整理技术文档"),
+    (ActivityType.EATING, "和同事冲去吃午饭"),
+    (ActivityType.COOKING, "正在做饭"),
+])
+def test_focus_activities_are_not_blocked_by_activity_type(
+    activity_type: ActivityType, description: str,
+) -> None:
+    """“专注”门槛已移除：工作/学习/吃饭/做饭不再按活动类型拦截，只保留睡眠、洗澡、驾驶等硬规则。"""
+    activity = ActivityInfo(
+        activity_type, description,
+        time_window="09:00-11:00", as_of="2026-10-23T10:00:00+08:00", timezone="Asia/Shanghai",
+    )
+    now = datetime.fromisoformat("2026-10-23T10:00:00+08:00")
+    assert activity.publication_block_reason(now=now) == ""
 
 
 def test_fresh_life_energy_blocks_even_if_scene_belongs_to_a_previous_activity() -> None:
